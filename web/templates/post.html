@@ -23,6 +23,10 @@
       {% if post.summary %}
       <p class="post-summary">{{ post.summary }}</p>
       {% endif %}
+      {% set preview_img = post.raw_content | first_image %}
+      {% if preview_img %}
+      <img src="{{ preview_img }}" class="post-preview-img" alt="{{ post.title }}">
+      {% endif %}
     </div>
   </div>
 </div>

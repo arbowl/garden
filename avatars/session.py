@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import random
+import re
 import time
 from dataclasses import dataclass, field
 
@@ -19,9 +20,11 @@ from db.queries import (
     get_comments_for_post,
     get_hot_posts,
     get_instance,
+    get_new_posts,
     get_pending_replies,
     get_unresolved_mention_posts_for_instance,
     insert_comment,
+    insert_mention,
     insert_notification,
     insert_session,
     insert_vote,
@@ -45,6 +48,34 @@ from llm.prompts import (
 from db.models import AuthorType
 
 logger = logging.getLogger(__name__)
+
+_MENTION_RE = re.compile(r"@(\w+)")
+
+
+async def _handle_mentions(db, body: str, comment_id: int, post_id: int) -> None:
+    names = {m.lower() for m in _MENTION_RE.findall(body)}
+    if not names:
+        return
+    for name in names:
+        async with db.execute(
+            "SELECT id FROM instances WHERE lower(name) = ? AND is_active = 1 LIMIT 1",
+            (name,),
+        ) as cur:
+            row = await cur.fetchone()
+        if row:
+            await insert_mention(db, comment_id, row["id"], post_id)
+
+
+def _reformat_bot_mentions(body: str, comments: list) -> str:
+    """Replace #id - name patterns the LLM emits (mimicking thread format) with @name."""
+    comment_map = {c.id: c.author_name for c in comments}
+
+    def _replace(m: re.Match) -> str:
+        name = m.group(2) or comment_map.get(int(m.group(1)))
+        return f"@{name}" if name else m.group(0)
+
+    return re.sub(r"#(\d+)(?:\s*-\s*(\w+))?", _replace, body)
+
 
 _AFFINITY_WEIGHT = 1.0  # additive boost per matched-favor tag in pool ranking
 _MIN_ENGAGE = 2  # floor: force this many posts into engage_set if triage comes up short
@@ -180,9 +211,26 @@ class AvatarSession:
         system_prompt: str,
         stats: SessionStats,
     ) -> None:
+        bias = instance.new_post_bias  # -1.0 = hot-heavy, 0.0 = default, 1.0 = new-heavy
+
+        if bias >= 0:
+            hot_limit = max(5, round(30 * (1.0 - bias * 0.67)))
+            new_limit = round(5 + bias * 25)
+        else:
+            hot_limit = 30
+            new_limit = max(0, round(5 + bias * 5))
+
         all_posts = await get_hot_posts(
-            self.db, limit=30, max_per_source=settings.max_posts_per_source
+            self.db, limit=hot_limit, max_per_source=settings.max_posts_per_source
         )
+        new_posts = await get_new_posts(self.db, limit=new_limit)
+        new_post_ids = {p.id for p in new_posts}
+        existing_ids = {p.id for p in all_posts}
+        for p in new_posts:
+            if p.id not in existing_ids:
+                all_posts.append(p)
+                existing_ids.add(p.id)
+
         board_post = await get_active_board_post(self.db)
         if board_post and board_post.id not in {p.id for p in all_posts}:
             all_posts.insert(0, board_post)
@@ -196,10 +244,21 @@ class AvatarSession:
                 existing_ids.add(mp.id)
 
         commented_ids = await get_avatar_commented_post_ids(self.db, self.instance_id)
+
+        # Calibrate the recency bonus against the median hot score so new posts
+        # compete meaningfully regardless of the absolute hot_score scale.
+        hot_weight = max(0.0, min(1.0, 1.0 - bias))
+        if bias > 0:
+            hot_scores = sorted(p.hot_score for p in all_posts if p.hot_score > 0)
+            median_hot = hot_scores[len(hot_scores) // 2] if hot_scores else 1.0
+        else:
+            median_hot = 0.0
+
         posts = sorted(
             [p for p in all_posts if p.comment_count < settings.max_post_comments],
             key=lambda p: (
-                p.hot_score * (0.5 if p.id in commented_ids else 1.0)
+                p.hot_score * (0.5 if p.id in commented_ids else 1.0) * hot_weight
+                + (bias * median_hot if p.id in new_post_ids else 0.0)
                 + post_affinity_score(p.tags, archetype, drift) * _AFFINITY_WEIGHT
             ),
             reverse=True,
@@ -384,9 +443,9 @@ class AvatarSession:
 
         body: str | None = None
         if parent_id and result.reply_text:
-            body = result.reply_text
+            body = _reformat_bot_mentions(result.reply_text, comments)
         elif result.comment:
-            body = result.comment
+            body = _reformat_bot_mentions(result.comment, comments)
 
         if (
             body
@@ -419,6 +478,7 @@ class AvatarSession:
             logger.info(
                 "[%s] commented on post %d (comment %d)", instance.name, post.id, comment_id
             )
+            await _handle_mentions(self.db, body, comment_id, post.id)
             if mention_post_ids and post.id in mention_post_ids:
                 await resolve_mentions_for_instance(self.db, self.instance_id, [post.id])
 
@@ -521,6 +581,7 @@ class AvatarSession:
             stats.comments_made += 1
             stats.comment_snippets.append(result.reply[:100])
             memory.add_comment(post_title, result.reply[:120])
+            await _handle_mentions(self.db, result.reply, new_comment_id, reply.post_id)
             logger.info(
                 "[%s] replied to %s on post %d", instance.name, reply.author_name, reply.post_id
             )

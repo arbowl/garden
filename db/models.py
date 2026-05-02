@@ -114,6 +114,7 @@ class Archetype:
     max_instances: int
     is_active: bool
     created_at: str
+    new_post_bias: float = 0.0
     tone: str | None = None
     sentence_style: str | None = None
     vocabulary_level: str | None = None
@@ -140,6 +141,7 @@ class Instance:
     created_at: str
     last_session: str | None = None
     mood: str | None = None
+    new_post_bias: float = 0.0
 
 
 @dataclass

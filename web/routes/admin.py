@@ -11,12 +11,14 @@ from db.queries import (
     count_posts_by_status,
     create_archetype,
     create_instance,
+    delete_instance,
     get_all_archetypes,
     get_all_instances,
     get_archetype,
     get_instance,
     get_instances_for_archetype,
     get_recent_sessions,
+    update_archetype,
 )
 from ingest.fetcher import fetch_source
 from ingest.sources import Source, load_sources, save_sources
@@ -51,6 +53,15 @@ async def archetype_new_form(request: Request):
     return templates.TemplateResponse(request, "admin/archetype_form.html", {"archetype": None})
 
 
+@router.get("/archetypes/{archetype_id}/edit", response_class=HTMLResponse)
+async def archetype_edit_form(request: Request, archetype_id: int):
+    db = await get_db()
+    archetype = await get_archetype(db, archetype_id)
+    if not archetype:
+        raise HTTPException(status_code=404, detail="Archetype not found")
+    return templates.TemplateResponse(request, "admin/archetype_form.html", {"archetype": archetype})
+
+
 @router.post("/archetypes")
 async def archetype_create(
     request: Request,
@@ -71,6 +82,7 @@ async def archetype_create(
     contrarian_factor: float = Form(0.1),
     temperature: float = Form(0.7),
     max_instances: int = Form(1),
+    new_post_bias: float = Form(0.0),
 ):
     def _split(s: str) -> list[str]:
         return [x.strip() for x in s.split(",") if x.strip()]
@@ -96,6 +108,7 @@ async def archetype_create(
         contrarian_factor=contrarian_factor,
         temperature=temperature,
         max_instances=max_instances,
+        new_post_bias=max(-1.0, min(1.0, new_post_bias)),
     )
     return RedirectResponse(url=f"/admin/archetypes/{archetype_id}", status_code=303)
 
@@ -117,6 +130,65 @@ async def archetype_detail(request: Request, archetype_id: int):
     )
 
 
+@router.post("/archetypes/{archetype_id}/edit")
+async def archetype_edit(
+    request: Request,
+    archetype_id: int,
+    name: str = Form(...),
+    role: str = Form(...),
+    bio: str = Form(...),
+    tone: str = Form(""),
+    sentence_style: str = Form(""),
+    vocabulary_level: str = Form(""),
+    quirks: str = Form(""),
+    example_comment: str = Form(""),
+    favors: str = Form(""),
+    dislikes: str = Form(""),
+    vote_probability: float = Form(0.7),
+    comment_threshold: float = Form(0.5),
+    reply_probability: float = Form(0.6),
+    verbosity: str = Form("medium"),
+    contrarian_factor: float = Form(0.1),
+    temperature: float = Form(0.7),
+    max_instances: int = Form(1),
+    is_active: str = Form(""),
+    new_post_bias: float = Form(0.0),
+):
+    def _split(s: str) -> list[str]:
+        return [x.strip() for x in s.split(",") if x.strip()]
+
+    db = await get_db()
+    archetype = await get_archetype(db, archetype_id)
+    if not archetype:
+        raise HTTPException(status_code=404, detail="Archetype not found")
+    await update_archetype(
+        db,
+        archetype_id=archetype_id,
+        name=name,
+        bio=bio,
+        role=role,
+        tone=tone or None,
+        sentence_style=sentence_style or None,
+        vocabulary_level=vocabulary_level or None,
+        quirks=quirks or None,
+        example_comment=example_comment or None,
+        favors=_split(favors),
+        dislikes=_split(dislikes),
+        indifferent=[],
+        vote_probability=vote_probability,
+        comment_threshold=comment_threshold,
+        reply_probability=reply_probability,
+        verbosity=verbosity,
+        contrarian_factor=contrarian_factor,
+        temperature=temperature,
+        max_instances=max_instances,
+        is_active=is_active == "on",
+        new_post_bias=max(-1.0, min(1.0, new_post_bias)),
+    )
+    logger.info("Updated archetype %d", archetype_id)
+    return RedirectResponse(url=f"/admin/archetypes/{archetype_id}", status_code=303)
+
+
 @router.post("/archetypes/{archetype_id}/spawn")
 async def archetype_spawn(
     archetype_id: int,
@@ -133,8 +205,21 @@ async def archetype_spawn(
         name=name,
         drift_vector=DriftVector.random_seed().to_dict(),
         memory=Memory().to_dict(),
+        new_post_bias=archetype.new_post_bias,
     )
     logger.info("Spawned instance %s (%s) from archetype %d", instance_id, name, archetype_id)
+    return RedirectResponse(url=f"/admin/archetypes/{archetype_id}", status_code=303)
+
+
+@router.post("/instances/{instance_id}/delete")
+async def instance_delete(instance_id: str):
+    db = await get_db()
+    instance = await get_instance(db, instance_id)
+    if not instance:
+        raise HTTPException(status_code=404, detail="Instance not found")
+    archetype_id = instance.archetype_id
+    await delete_instance(db, instance_id)
+    logger.info("Deleted instance %s", instance_id)
     return RedirectResponse(url=f"/admin/archetypes/{archetype_id}", status_code=303)
 
 

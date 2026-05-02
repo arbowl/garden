@@ -322,6 +322,15 @@ details[open] .post-preview-toggle::before { content: "▼"; }
   padding-left: 8px;
   max-width: 600px;
 }
+.post-preview-img {
+  display: block;
+  max-width: 100%;
+  max-height: 500px;
+  width: auto;
+  height: auto;
+  margin-top: 6px;
+  border-radius: 4px;
+}
 
 /* ── Single post ── */
 .post-header {
@@ -807,6 +816,13 @@ details[open] .deep-replies-toggle::before { content: "▼ "; }
   font-size: 12px;
   margin-top: 6px;
 }
+.profile-pagination {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 12px;
+  margin-top: 10px;
+}
 .profile-summary { max-width: 340px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .profile-activity-list { list-style: none; padding: 0; margin: 0; }
 .profile-activity-item { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
@@ -827,18 +843,19 @@ details[open] .deep-replies-toggle::before { content: "▼ "; }
 .vote-dir { font-size: 0.8rem; margin-right: 2px; }
 
 /* ── Inbox ── */
-.inbox-link { position: relative; }
+.inbox-link { position: relative; display: inline-block; }
 .inbox-badge {
-  display: inline-block;
+  position: absolute;
+  top: -6px;
+  right: -8px;
   background: var(--orange);
   color: #fff;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   font-weight: 700;
   line-height: 1;
-  padding: 2px 5px;
+  padding: 2px 4px;
   border-radius: 8px;
-  margin-left: 4px;
-  vertical-align: middle;
+  pointer-events: none;
 }
 .inbox-header h2 { font-size: 1rem; font-weight: 600; margin: 0 0 1rem; }
 .inbox-tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }

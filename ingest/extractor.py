@@ -9,11 +9,22 @@ logger = logging.getLogger(__name__)
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
+_IMG_TAG_RE = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
+_IMG_ATTR_RE = re.compile(r'\b(?:title|alt)="([^"]+)"', re.IGNORECASE)
 
 
 def _strip_html(text: str) -> str:
+    # Collect unique title/alt values from img tags before stripping (e.g. XKCD hover text)
+    img_texts: list[str] = []
+    for img_tag in _IMG_TAG_RE.findall(text):
+        for val in _IMG_ATTR_RE.findall(img_tag):
+            if val and val not in img_texts:
+                img_texts.append(val)
     text = _HTML_TAG_RE.sub(" ", text)
-    return _WHITESPACE_RE.sub(" ", text).strip()
+    text = _WHITESPACE_RE.sub(" ", text).strip()
+    if img_texts:
+        text = (text + " " + " ".join(img_texts)).strip()
+    return text
 
 
 @dataclass

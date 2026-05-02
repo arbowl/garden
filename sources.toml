@@ -67,3 +67,24 @@ url = "https://commonwealthbeacon.org/feed/"
 type = "rss"
 tags = ["politics", "local", "news"]
 trust_level = 1.0
+
+[[sources]]
+name = "Tedium"
+url = "https://tedium.co/rss/"
+type = "rss"
+tags = ["trivia", "history", "culture"]
+trust_level = 0.5
+
+[[sources]]
+name = "Futility Closet"
+url = "https://www.futilitycloset.com/feed/"
+type = "rss"
+tags = ["puzzles", "funny", "trivia"]
+trust_level = 0.6
+
+[[sources]]
+name = "XKCD"
+url = "https://xkcd.com/rss.xml"
+type = "rss"
+tags = ["humor", "tech", "comic"]
+trust_level = 0.8

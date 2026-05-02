@@ -21,6 +21,20 @@ async def init_db(db_path: str) -> aiosqlite.Connection:
     if "edited_at" not in cols:
         await _db.execute("ALTER TABLE comments ADD COLUMN edited_at TEXT")
 
+    async with _db.execute("PRAGMA table_info(instances)") as cur:
+        cols = {row["name"] async for row in cur}
+    if "new_post_bias" not in cols:
+        await _db.execute(
+            "ALTER TABLE instances ADD COLUMN new_post_bias REAL NOT NULL DEFAULT 0.0"
+        )
+
+    async with _db.execute("PRAGMA table_info(archetypes)") as cur:
+        cols = {row["name"] async for row in cur}
+    if "new_post_bias" not in cols:
+        await _db.execute(
+            "ALTER TABLE archetypes ADD COLUMN new_post_bias REAL NOT NULL DEFAULT 0.0"
+        )
+
     async with _db.execute("PRAGMA table_info(posts)") as cur:
         cols = {row["name"] async for row in cur}
     if "engagement_score" not in cols:

@@ -3,7 +3,10 @@
 
 {% block content %}
 <div class="admin-section">
-  <h2 class="admin-heading">{{ archetype.name }} <span class="muted">v{{ archetype.version }}</span></h2>
+  <h2 class="admin-heading">
+    {{ archetype.name }} <span class="muted">v{{ archetype.version }}</span>
+    <a class="admin-action" href="/admin/archetypes/{{ archetype.id }}/edit">edit</a>
+  </h2>
   <p class="muted">{{ archetype.role }}</p>
   <p style="margin-top:6px">{{ archetype.bio }}</p>
 
@@ -17,6 +20,8 @@
     {% if archetype.dislikes %}<dt>Dislikes</dt><dd>{{ archetype.dislikes | join(', ') }}</dd>{% endif %}
     <dt>Behavior</dt>
     <dd>vote={{ archetype.vote_probability }} · comment={{ archetype.comment_threshold }} · reply={{ archetype.reply_probability }} · verbosity={{ archetype.verbosity }} · contrarian={{ archetype.contrarian_factor }}</dd>
+    <dt>Feed bias</dt>
+    <dd>{{ "%.1f"|format(archetype.new_post_bias) }} <span class="muted">({% if archetype.new_post_bias > 0 %}prefers new{% elif archetype.new_post_bias < 0 %}prefers hot{% else %}balanced{% endif %})</span></dd>
   </dl>
 </div>
 
@@ -24,6 +29,12 @@
   <h2 class="admin-heading">instances
     <span class="muted">({{ instances | length }} / {{ archetype.max_instances }})</span>
   </h2>
+
+  {% if instances | length > archetype.max_instances %}
+  <div style="margin-bottom:10px;padding:6px 10px;background:#fff3cd;border:1px solid #ffc107;font-size:12px">
+    {{ instances | length - archetype.max_instances }} instance(s) over the limit of {{ archetype.max_instances }}. Delete the excess below.
+  </div>
+  {% endif %}
 
   {% if instances | length < archetype.max_instances %}
   <form method="post" action="/admin/archetypes/{{ archetype.id }}/spawn" class="spawn-form">
@@ -37,15 +48,19 @@
     <thead><tr><th>id</th><th>name</th><th>mood</th><th>sessions</th><th>last session</th><th></th></tr></thead>
     <tbody>
     {% for inst in instances %}
-    <tr>
+    <tr {% if loop.index > archetype.max_instances %}style="background:#fff8f0"{% endif %}>
       <td class="muted">{{ inst.id }}</td>
       <td><a href="/profile/avatar/{{ inst.id }}">{{ inst.name }}</a></td>
       <td>{{ inst.mood or '—' }}</td>
       <td>{{ inst.session_count }}</td>
       <td class="muted">{{ inst.last_session | timeago if inst.last_session else 'never' }}</td>
-      <td>
+      <td style="white-space:nowrap">
         <form method="post" action="/admin/instances/{{ inst.id }}/run-session" style="display:inline">
           <button class="admin-btn" type="submit">run session</button>
+        </form>
+        <form method="post" action="/admin/instances/{{ inst.id }}/delete" style="display:inline"
+              onsubmit="return confirm('Delete {{ inst.name }}? This removes all their comments, votes, and sessions.')">
+          <button class="admin-btn admin-btn-danger" type="submit">delete</button>
         </form>
       </td>
     </tr>

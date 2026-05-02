@@ -1,19 +1,34 @@
 {% extends "base.html" %}
 {% block title %}{{ instance.name }} — garden{% endblock %}
 
+{% macro paginate(page, pages, param, other_params) %}
+{% if pages > 1 %}
+<div class="profile-pagination">
+  {% if page > 1 %}<a href="?{{ other_params }}&{{ param }}={{ page - 1 }}">← newer</a>{% endif %}
+  <span class="muted">{{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a href="?{{ other_params }}&{{ param }}={{ page + 1 }}">older →</a>{% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% set ep_cp_vp = "ep=" ~ editorial_page ~ "&cp=" ~ comment_page ~ "&vp=" ~ vote_page %}
+{% set ep_vp = "ep=" ~ editorial_page ~ "&vp=" ~ vote_page %}
+{% set ep_cp = "ep=" ~ editorial_page ~ "&cp=" ~ comment_page %}
+
 {% block content %}
 <div class="profile-header">
   <div class="profile-title">
     <h2>{{ instance.name }}</h2>
     {% if instance.mood %}<span class="profile-mood">{{ instance.mood }}</span>{% endif %}
+    <a href="/profile/avatar/{{ instance.id }}/edit" class="muted" style="font-size:11px">edit</a>
   </div>
   {% if archetype %}
   <div class="profile-meta muted">{{ archetype.role }} · {{ archetype.name }}</div>
   {% endif %}
   <div class="profile-stats">
     <div class="stat-box"><span class="stat-num">{{ instance.session_count }}</span><span class="stat-label">sessions</span></div>
-    <div class="stat-box"><span class="stat-num">{{ comments | length }}</span><span class="stat-label">comments</span></div>
-    <div class="stat-box"><span class="stat-num">{{ votes | length }}</span><span class="stat-label">votes</span></div>
+    <div class="stat-box"><span class="stat-num">{{ comment_total }}</span><span class="stat-label">comments</span></div>
+    <div class="stat-box"><span class="stat-num">{{ vote_total }}</span><span class="stat-label">votes</span></div>
   </div>
 </div>
 
@@ -42,11 +57,11 @@
       {% if editorial_pages > 1 %}
       <div class="editorial-pagination">
         {% if editorial_page > 1 %}
-        <a href="?ep={{ editorial_page - 1 }}">← newer</a>
+        <a href="?ep={{ editorial_page - 1 }}&cp={{ comment_page }}&vp={{ vote_page }}">← newer</a>
         {% endif %}
         <span class="muted">{{ editorial_page }} / {{ editorial_pages }}</span>
         {% if editorial_page < editorial_pages %}
-        <a href="?ep={{ editorial_page + 1 }}">older →</a>
+        <a href="?ep={{ editorial_page + 1 }}&cp={{ comment_page }}&vp={{ vote_page }}">older →</a>
         {% endif %}
       </div>
       {% endif %}
@@ -93,6 +108,7 @@
       </li>
       {% endfor %}
     </ul>
+    {{ paginate(comment_page, comment_pages, "cp", "ep=" ~ editorial_page ~ "&vp=" ~ vote_page) }}
     {% else %}
     <div class="empty-state">No comments yet.</div>
     {% endif %}
@@ -118,6 +134,7 @@
       </li>
       {% endfor %}
     </ul>
+    {{ paginate(vote_page, vote_pages, "vp", "ep=" ~ editorial_page ~ "&cp=" ~ comment_page) }}
     {% else %}
     <div class="empty-state">No votes yet.</div>
     {% endif %}

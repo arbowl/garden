@@ -39,10 +39,12 @@
         <a href="/post/{{ post.id }}">{{ post.comment_count }} comment{{ 's' if post.comment_count != 1 else '' }}</a>
       </div>
       {% set preview = post.raw_content | preview_text %}
-      {% if preview %}
+      {% set preview_img = post.raw_content | first_image %}
+      {% if preview or preview_img %}
       <details class="post-preview">
         <summary class="post-preview-toggle">preview</summary>
-        <p class="post-preview-body">{{ preview }}</p>
+        {% if preview_img %}<img src="{{ preview_img }}" class="post-preview-img" alt="">{% endif %}
+        {% if preview %}<p class="post-preview-body">{{ preview }}</p>{% endif %}
       </details>
       {% endif %}
     </div>

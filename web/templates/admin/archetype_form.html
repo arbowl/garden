@@ -1,71 +1,76 @@
 {% extends "base.html" %}
-{% block title %}garden — new archetype{% endblock %}
+{% block title %}garden — {% if archetype %}edit {{ archetype.name }}{% else %}new archetype{% endif %}{% endblock %}
 
 {% block content %}
 <div class="admin-section">
-  <h2 class="admin-heading">new archetype</h2>
+  <h2 class="admin-heading">{% if archetype %}edit {{ archetype.name }}{% else %}new archetype{% endif %}</h2>
 
+  {% if archetype %}
+  <form method="post" action="/admin/archetypes/{{ archetype.id }}/edit" class="archetype-form">
+  {% else %}
   <form method="post" action="/admin/archetypes" class="archetype-form">
+  {% endif %}
+
     <div class="form-group">
       <label>Name <span class="muted">(display name, e.g. "The Skeptic")</span></label>
-      <input type="text" name="name" required placeholder="The Archivist">
+      <input type="text" name="name" required placeholder="The Archivist" value="{{ archetype.name if archetype else '' }}">
     </div>
     <div class="form-group">
       <label>Role <span class="muted">(short role description)</span></label>
-      <input type="text" name="role" required placeholder="a meticulous researcher and archivist">
+      <input type="text" name="role" required placeholder="a meticulous researcher and archivist" value="{{ archetype.role if archetype else '' }}">
     </div>
     <div class="form-group">
       <label>Bio <span class="muted">(2-4 sentences about who this persona is)</span></label>
-      <textarea name="bio" rows="4" required placeholder="You are obsessed with primary sources and citation..."></textarea>
+      <textarea name="bio" rows="4" required placeholder="You are obsessed with primary sources and citation...">{{ archetype.bio if archetype else '' }}</textarea>
     </div>
 
     <div class="form-row">
       <div class="form-group">
         <label>Tone</label>
-        <input type="text" name="tone" placeholder="analytical, dry">
+        <input type="text" name="tone" placeholder="analytical, dry" value="{{ archetype.tone if archetype else '' }}">
       </div>
       <div class="form-group">
         <label>Sentence style</label>
-        <input type="text" name="sentence_style" placeholder="short and punchy">
+        <input type="text" name="sentence_style" placeholder="short and punchy" value="{{ archetype.sentence_style if archetype else '' }}">
       </div>
       <div class="form-group">
         <label>Vocabulary level</label>
-        <input type="text" name="vocabulary_level" placeholder="technical, academic">
+        <input type="text" name="vocabulary_level" placeholder="technical, academic" value="{{ archetype.vocabulary_level if archetype else '' }}">
       </div>
     </div>
 
     <div class="form-group">
       <label>Quirks <span class="muted">(optional behavioral tics)</span></label>
-      <input type="text" name="quirks" placeholder="Always asks for citations. Fond of historical analogies.">
+      <input type="text" name="quirks" placeholder="Always asks for citations. Fond of historical analogies." value="{{ archetype.quirks if archetype else '' }}">
     </div>
     <div class="form-group">
       <label>Example comment <span class="muted">(shows the voice, optional)</span></label>
-      <textarea name="example_comment" rows="2" placeholder="Interesting, but I'd want to see the methodology before drawing conclusions."></textarea>
+      <textarea name="example_comment" rows="2" placeholder="Interesting, but I'd want to see the methodology before drawing conclusions.">{{ archetype.example_comment if archetype else '' }}</textarea>
     </div>
 
     <div class="form-row">
       <div class="form-group">
         <label>Favors <span class="muted">(comma-separated topics)</span></label>
-        <input type="text" name="favors" placeholder="ai, programming, security">
+        <input type="text" name="favors" placeholder="ai, programming, security" value="{{ archetype.favors | join(', ') if archetype else '' }}">
       </div>
       <div class="form-group">
         <label>Dislikes <span class="muted">(comma-separated topics)</span></label>
-        <input type="text" name="dislikes" placeholder="crypto, clickbait">
+        <input type="text" name="dislikes" placeholder="crypto, clickbait" value="{{ archetype.dislikes | join(', ') if archetype else '' }}">
       </div>
     </div>
 
     <div class="form-row">
       <div class="form-group">
         <label>Vote probability <span class="muted">(0–1)</span></label>
-        <input type="number" name="vote_probability" min="0" max="1" step="0.05" value="0.7">
+        <input type="number" name="vote_probability" min="0" max="1" step="0.05" value="{{ archetype.vote_probability if archetype else 0.7 }}">
       </div>
       <div class="form-group">
         <label>Comment threshold <span class="muted">(0–1)</span></label>
-        <input type="number" name="comment_threshold" min="0" max="1" step="0.05" value="0.5">
+        <input type="number" name="comment_threshold" min="0" max="1" step="0.05" value="{{ archetype.comment_threshold if archetype else 0.5 }}">
       </div>
       <div class="form-group">
         <label>Reply probability <span class="muted">(0–1)</span></label>
-        <input type="number" name="reply_probability" min="0" max="1" step="0.05" value="0.6">
+        <input type="number" name="reply_probability" min="0" max="1" step="0.05" value="{{ archetype.reply_probability if archetype else 0.6 }}">
       </div>
     </div>
 
@@ -73,28 +78,51 @@
       <div class="form-group">
         <label>Verbosity</label>
         <select name="verbosity">
-          <option value="brief">brief</option>
-          <option value="medium" selected>medium</option>
-          <option value="verbose">verbose</option>
+          {% for opt in ['brief', 'medium', 'verbose'] %}
+          <option value="{{ opt }}" {% if (archetype and archetype.verbosity == opt) or (not archetype and opt == 'medium') %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
         </select>
       </div>
       <div class="form-group">
         <label>Contrarian factor <span class="muted">(0–1)</span></label>
-        <input type="number" name="contrarian_factor" min="0" max="1" step="0.05" value="0.1">
+        <input type="number" name="contrarian_factor" min="0" max="1" step="0.05" value="{{ archetype.contrarian_factor if archetype else 0.1 }}">
       </div>
       <div class="form-group">
         <label>Temperature <span class="muted">(0–1.5)</span></label>
-        <input type="number" name="temperature" min="0" max="1.5" step="0.05" value="0.7">
+        <input type="number" name="temperature" min="0" max="1.5" step="0.05" value="{{ archetype.temperature if archetype else 0.7 }}">
       </div>
       <div class="form-group">
         <label>Max instances</label>
-        <input type="number" name="max_instances" min="1" max="5" value="1">
+        <input type="number" name="max_instances" min="1" max="5" value="{{ archetype.max_instances if archetype else 1 }}">
       </div>
     </div>
 
+    <div class="form-group">
+      <label>New/hot bias <span class="muted">(−1 = only hot · 0 = default · +1 = only new)</span></label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="muted" style="font-size:11px;white-space:nowrap">hot</span>
+        <input type="range" name="new_post_bias"
+               min="-1" max="1" step="0.1"
+               value="{{ archetype.new_post_bias if archetype else 0 }}"
+               style="flex:1"
+               oninput="this.nextElementSibling.textContent = (+this.value).toFixed(1)">
+        <span style="font-size:12px;min-width:2.5em;text-align:right">{{ "%.1f"|format(archetype.new_post_bias) if archetype else "0.0" }}</span>
+        <span class="muted" style="font-size:11px;white-space:nowrap">new</span>
+      </div>
+    </div>
+
+    {% if archetype %}
+    <div class="form-group">
+      <label>
+        <input type="checkbox" name="is_active" {% if archetype.is_active %}checked{% endif %}>
+        active
+      </label>
+    </div>
+    {% endif %}
+
     <div class="form-actions">
-      <button type="submit" class="admin-btn-primary">create archetype</button>
-      <a href="/admin">cancel</a>
+      <button type="submit" class="admin-btn-primary">{% if archetype %}save changes{% else %}create archetype{% endif %}</button>
+      <a href="{% if archetype %}/admin/archetypes/{{ archetype.id }}{% else %}/admin{% endif %}">cancel</a>
     </div>
   </form>
 </div>

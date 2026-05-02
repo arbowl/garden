@@ -45,6 +45,7 @@ def _row_to_archetype(row: aiosqlite.Row) -> Archetype:
         temperature=row["temperature"],
         max_instances=row["max_instances"],
         is_active=bool(row["is_active"]),
+        new_post_bias=row["new_post_bias"] if "new_post_bias" in row.keys() else 0.0,
         created_at=row["created_at"],
     )
 
@@ -62,6 +63,7 @@ def _row_to_instance(row: aiosqlite.Row) -> Instance:
         created_at=row["created_at"],
         last_session=row["last_session"],
         mood=row["mood"],
+        new_post_bias=row["new_post_bias"] if "new_post_bias" in row.keys() else 0.0,
     )
 
 
@@ -114,13 +116,14 @@ async def create_archetype(
     contrarian_factor: float,
     temperature: float,
     max_instances: int,
+    new_post_bias: float = 0.0,
 ) -> int:
     async with db.execute(
         """INSERT INTO archetypes
            (name, bio, role, tone, sentence_style, vocabulary_level, quirks, example_comment,
             favors, dislikes, indifferent, vote_probability, comment_threshold, reply_probability,
-            verbosity, contrarian_factor, temperature, max_instances)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            verbosity, contrarian_factor, temperature, max_instances, new_post_bias)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             name,
             bio,
@@ -140,6 +143,7 @@ async def create_archetype(
             contrarian_factor,
             temperature,
             max_instances,
+            new_post_bias,
         ),
     ) as cur:
         archetype_id = cur.lastrowid
@@ -258,11 +262,13 @@ async def create_instance(
     name: str,
     drift_vector: dict,
     memory: dict,
+    new_post_bias: float = 0.0,
 ) -> str:
     instance_id = str(uuid.uuid4())[:8]
     await db.execute(
-        """INSERT INTO instances (id, archetype_id, archetype_version, name, drift_vector, memory)
-           VALUES (?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO instances
+           (id, archetype_id, archetype_version, name, drift_vector, memory, new_post_bias)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
         (
             instance_id,
             archetype_id,
@@ -270,10 +276,114 @@ async def create_instance(
             name,
             json.dumps(drift_vector),
             json.dumps(memory),
+            new_post_bias,
         ),
     )
     await db.commit()
     return instance_id
+
+
+async def update_instance(
+    db: aiosqlite.Connection,
+    instance_id: str,
+    name: str,
+    mood: str | None,
+    is_active: bool,
+    new_post_bias: float = 0.0,
+) -> None:
+    await db.execute(
+        "UPDATE instances SET name = ?, mood = ?, is_active = ?, new_post_bias = ? WHERE id = ?",
+        (name, mood or None, int(is_active), new_post_bias, instance_id),
+    )
+    await db.commit()
+
+
+async def delete_instance(db: aiosqlite.Connection, instance_id: str) -> None:
+    # Find all comments by this instance and their full descendant trees
+    async with db.execute(
+        """
+        WITH RECURSIVE descendants(id, post_id) AS (
+            SELECT id, post_id FROM comments
+             WHERE author_id = ? AND author_type = 'avatar'
+            UNION ALL
+            SELECT c.id, c.post_id FROM comments c
+              JOIN descendants d ON c.parent_comment_id = d.id
+        )
+        SELECT id, post_id FROM descendants
+        """,
+        (instance_id,),
+    ) as cur:
+        rows = await cur.fetchall()
+
+    if rows:
+        ids = [r["id"] for r in rows]
+        placeholders = ",".join("?" * len(ids))
+        await db.execute(f"DELETE FROM votes WHERE comment_id IN ({placeholders})", ids)
+        await db.execute(f"DELETE FROM mentions WHERE comment_id IN ({placeholders})", ids)
+        await db.execute(f"DELETE FROM notifications WHERE comment_id IN ({placeholders})", ids)
+        await db.execute(f"DELETE FROM comments WHERE id IN ({placeholders})", ids)
+        # Recount comment_count per affected post from remaining comments
+        affected_posts = {r["post_id"] for r in rows}
+        for post_id in affected_posts:
+            await db.execute(
+                "UPDATE posts SET comment_count = (SELECT COUNT(*) FROM comments WHERE post_id = ?) WHERE id = ?",
+                (post_id, post_id),
+            )
+
+    await db.execute(
+        "DELETE FROM votes WHERE voter_id = ? AND voter_type = 'avatar'", (instance_id,)
+    )
+    await db.execute("DELETE FROM mentions WHERE instance_id = ?", (instance_id,))
+    await db.execute("DELETE FROM sessions WHERE instance_id = ?", (instance_id,))
+    await db.execute("DELETE FROM editorials WHERE instance_id = ?", (instance_id,))
+    await db.execute("DELETE FROM instances WHERE id = ?", (instance_id,))
+    await db.commit()
+
+
+async def update_archetype(
+    db: aiosqlite.Connection,
+    archetype_id: int,
+    name: str,
+    bio: str,
+    role: str,
+    tone: str | None,
+    sentence_style: str | None,
+    vocabulary_level: str | None,
+    quirks: str | None,
+    example_comment: str | None,
+    favors: list[str],
+    dislikes: list[str],
+    indifferent: list[str],
+    vote_probability: float,
+    comment_threshold: float,
+    reply_probability: float,
+    verbosity: str,
+    contrarian_factor: float,
+    temperature: float,
+    max_instances: int,
+    is_active: bool,
+    new_post_bias: float = 0.0,
+) -> None:
+    await db.execute(
+        """UPDATE archetypes SET
+               name = ?, bio = ?, role = ?, tone = ?, sentence_style = ?,
+               vocabulary_level = ?, quirks = ?, example_comment = ?,
+               favors = ?, dislikes = ?, indifferent = ?,
+               vote_probability = ?, comment_threshold = ?, reply_probability = ?,
+               verbosity = ?, contrarian_factor = ?, temperature = ?,
+               max_instances = ?, is_active = ?, new_post_bias = ?,
+               version = version + 1
+           WHERE id = ?""",
+        (
+            name, bio, role, tone, sentence_style, vocabulary_level, quirks, example_comment,
+            json.dumps(favors), json.dumps(dislikes), json.dumps(indifferent),
+            vote_probability, comment_threshold, reply_probability,
+            verbosity, contrarian_factor, temperature,
+            max_instances, int(is_active), new_post_bias,
+            archetype_id,
+        ),
+    )
+    await db.commit()
 
 
 async def update_instance_post_session(
@@ -806,7 +916,7 @@ async def get_instance_sessions(
 
 
 async def get_instance_comments(
-    db: aiosqlite.Connection, instance_id: str, limit: int = 50
+    db: aiosqlite.Connection, instance_id: str, limit: int = 25, offset: int = 0
 ) -> list[dict]:
     async with db.execute(
         """
@@ -816,16 +926,25 @@ async def get_instance_comments(
         JOIN posts p ON p.id = c.post_id
         WHERE c.author_id = ? AND c.author_type = 'avatar'
         ORDER BY c.created_at DESC
-        LIMIT ?
+        LIMIT ? OFFSET ?
         """,
-        (instance_id, limit),
+        (instance_id, limit, offset),
     ) as cur:
         rows = await cur.fetchall()
     return [dict(r) for r in rows]
 
 
+async def count_instance_comments(db: aiosqlite.Connection, instance_id: str) -> int:
+    async with db.execute(
+        "SELECT COUNT(*) FROM comments WHERE author_id = ? AND author_type = 'avatar'",
+        (instance_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    return row[0] if row else 0
+
+
 async def get_instance_votes(
-    db: aiosqlite.Connection, instance_id: str, limit: int = 50
+    db: aiosqlite.Connection, instance_id: str, limit: int = 25, offset: int = 0
 ) -> list[dict]:
     async with db.execute(
         """
@@ -842,15 +961,24 @@ async def get_instance_votes(
         LEFT JOIN posts cp ON cp.id = c.post_id
         WHERE v.voter_id = ? AND v.voter_type = 'avatar'
         ORDER BY v.created_at DESC
-        LIMIT ?
+        LIMIT ? OFFSET ?
         """,
-        (instance_id, limit),
+        (instance_id, limit, offset),
     ) as cur:
         rows = await cur.fetchall()
     return [dict(r) for r in rows]
 
 
-async def get_human_comments(db: aiosqlite.Connection, limit: int = 50) -> list[dict]:
+async def count_instance_votes(db: aiosqlite.Connection, instance_id: str) -> int:
+    async with db.execute(
+        "SELECT COUNT(*) FROM votes WHERE voter_id = ? AND voter_type = 'avatar'",
+        (instance_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    return row[0] if row else 0
+
+
+async def get_human_comments(db: aiosqlite.Connection, limit: int = 25, offset: int = 0) -> list[dict]:
     async with db.execute(
         """
         SELECT c.id, c.post_id, c.body, c.vote_count, c.created_at,
@@ -863,12 +991,20 @@ async def get_human_comments(db: aiosqlite.Connection, limit: int = 50) -> list[
         JOIN posts p ON p.id = c.post_id
         WHERE c.author_type = 'human'
         ORDER BY c.created_at DESC
-        LIMIT ?
+        LIMIT ? OFFSET ?
         """,
-        (limit,),
+        (limit, offset),
     ) as cur:
         rows = await cur.fetchall()
     return [dict(r) for r in rows]
+
+
+async def count_human_comments(db: aiosqlite.Connection) -> int:
+    async with db.execute(
+        "SELECT COUNT(*) FROM comments WHERE author_type = 'human'",
+    ) as cur:
+        row = await cur.fetchone()
+    return row[0] if row else 0
 
 
 async def get_new_comments(db: aiosqlite.Connection, limit: int = 10) -> list[dict]:
@@ -906,7 +1042,7 @@ async def get_hot_comments(db: aiosqlite.Connection, pool_size: int = 100) -> li
     return [dict(r) for r in rows]
 
 
-async def get_human_votes(db: aiosqlite.Connection, limit: int = 50) -> list[dict]:
+async def get_human_votes(db: aiosqlite.Connection, limit: int = 25, offset: int = 0) -> list[dict]:
     async with db.execute(
         """
         SELECT v.id, v.direction, v.created_at,
@@ -919,12 +1055,20 @@ async def get_human_votes(db: aiosqlite.Connection, limit: int = 50) -> list[dic
         LEFT JOIN comments c ON c.id = v.comment_id
         WHERE v.voter_type = 'human'
         ORDER BY v.created_at DESC
-        LIMIT ?
+        LIMIT ? OFFSET ?
         """,
-        (limit,),
+        (limit, offset),
     ) as cur:
         rows = await cur.fetchall()
     return [dict(r) for r in rows]
+
+
+async def count_human_votes(db: aiosqlite.Connection) -> int:
+    async with db.execute(
+        "SELECT COUNT(*) FROM votes WHERE voter_type = 'human'",
+    ) as cur:
+        row = await cur.fetchone()
+    return row[0] if row else 0
 
 
 # ── Mention queries ──────────────────────────────────────────────────────────

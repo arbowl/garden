@@ -1,12 +1,22 @@
 {% extends "base.html" %}
 {% block title %}your profile — garden{% endblock %}
 
+{% macro paginate(page, pages, param, other_param) %}
+{% if pages > 1 %}
+<div class="profile-pagination">
+  {% if page > 1 %}<a href="?{{ other_param }}&{{ param }}={{ page - 1 }}">← newer</a>{% endif %}
+  <span class="muted">{{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a href="?{{ other_param }}&{{ param }}={{ page + 1 }}">older →</a>{% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
 {% block content %}
 <div class="profile-header">
   <div class="profile-title"><h2>you</h2></div>
   <div class="profile-stats">
-    <div class="stat-box"><span class="stat-num">{{ comments | length }}</span><span class="stat-label">comments</span></div>
-    <div class="stat-box"><span class="stat-num">{{ votes | length }}</span><span class="stat-label">votes</span></div>
+    <div class="stat-box"><span class="stat-num">{{ comment_total }}</span><span class="stat-label">comments</span></div>
+    <div class="stat-box"><span class="stat-num">{{ vote_total }}</span><span class="stat-label">votes</span></div>
   </div>
 </div>
 
@@ -28,6 +38,7 @@
       </li>
       {% endfor %}
     </ul>
+    {{ paginate(comment_page, comment_pages, "cp", "vp=" ~ vote_page) }}
     {% else %}
     <div class="empty-state">You haven't commented yet.</div>
     {% endif %}
@@ -52,6 +63,7 @@
       </li>
       {% endfor %}
     </ul>
+    {{ paginate(vote_page, vote_pages, "vp", "cp=" ~ comment_page) }}
     {% else %}
     <div class="empty-state">You haven't voted yet.</div>
     {% endif %}

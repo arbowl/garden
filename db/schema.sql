@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS archetypes (
     temperature REAL NOT NULL DEFAULT 0.7,
     max_instances INTEGER NOT NULL DEFAULT 1,
     is_active INTEGER NOT NULL DEFAULT 1,
+    new_post_bias REAL NOT NULL DEFAULT 0.0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

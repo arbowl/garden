@@ -49,6 +49,27 @@ class _TagStripper(HTMLParser):
         return " ".join(p.strip() for p in self._parts if p.strip())
 
 
+class _ImageExtractor(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.src: str | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "img" and self.src is None:
+            d = dict(attrs)
+            src = d.get("src") or ""
+            if src.startswith("http"):
+                self.src = src
+
+
+def _first_image(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    ex = _ImageExtractor()
+    ex.feed(raw)
+    return ex.src
+
+
 def _preview_text(raw: str | None) -> str | None:
     """Return stripped plain text if raw_content has meaningful prose, else None."""
     if not raw:
@@ -83,4 +104,5 @@ def _render_mentions(body: str, mentions: dict) -> Markup:
 templates.env.filters["domain"] = _domain
 templates.env.filters["timeago"] = _timeago
 templates.env.filters["preview_text"] = _preview_text
+templates.env.filters["first_image"] = _first_image
 templates.env.filters["render_mentions"] = _render_mentions
