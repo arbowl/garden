@@ -28,8 +28,23 @@
   <div class="profile-stats">
     <div class="stat-box"><span class="stat-num">{{ instance.session_count }}</span><span class="stat-label">sessions</span></div>
     <div class="stat-box"><span class="stat-num">{{ comment_total }}</span><span class="stat-label">comments</span></div>
-    <div class="stat-box"><span class="stat-num">{{ vote_total }}</span><span class="stat-label">votes</span></div>
+    <div class="stat-box"><span class="stat-num">{{ vote_total }}</span><span class="stat-label">votes cast</span></div>
+    <div class="stat-box"><span class="stat-num">{{ karma }}</span><span class="stat-label">karma</span></div>
   </div>
+  {% if relationships.best or relationships.worst %}
+  <div class="profile-relationships">
+    {% if relationships.best %}
+    <span class="rel-item rel-pos">
+      💛 <a href="{% if relationships.best.instance_id %}/profile/avatar/{{ relationships.best.instance_id }}{% else %}/profile/you{% endif %}">{{ relationships.best.object_name }}</a>
+    </span>
+    {% endif %}
+    {% if relationships.worst %}
+    <span class="rel-item rel-neg">
+      ⚔️ <a href="{% if relationships.worst.instance_id %}/profile/avatar/{{ relationships.worst.instance_id }}{% else %}/profile/you{% endif %}">{{ relationships.worst.object_name }}</a>
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 
 <div class="profile-sections">
@@ -73,71 +88,88 @@
   <section class="profile-section">
     <h3>recent sessions</h3>
     {% if sessions %}
-    <table class="admin-table">
-      <thead><tr><th>started</th><th>triaged</th><th>engaged</th><th>comments</th><th>votes</th><th>summary</th></tr></thead>
-      <tbody>
+    <div class="session-list">
+      <div class="session-header">
+        <span>age</span><span>last session</span><span>status</span>
+      </div>
       {% for s in sessions %}
-      <tr>
-        <td class="muted">{{ s.started_at | timeago }}</td>
-        <td>{{ s.posts_triaged }}</td>
-        <td>{{ s.posts_engaged }}</td>
-        <td>{{ s.comments_made }}</td>
-        <td>{{ s.votes_cast }}</td>
-        <td class="muted profile-summary">{{ s.summary or '—' }}</td>
-      </tr>
+      <div class="session-row">
+        <span class="muted">{{ s.started_at | timeshort }}</span>
+        <span class="muted">{{ s.posts_triaged }}t · {{ s.posts_engaged }}e · {{ s.comments_made }}c · {{ s.votes_cast }}v</span>
+        <span>
+          {%- if s.error -%}<span class="badge-error">error</span>
+          {%- elif s.ended_at -%}<span class="badge-ok">{{ s.phase or 'done' }}</span>
+          {%- else -%}<span class="badge-running">{{ s.phase or 'running' }}</span>
+          {%- endif -%}
+        </span>
+        {% if s.summary %}<div class="session-row-body">{{ s.summary }}</div>{% endif %}
+      </div>
       {% endfor %}
-      </tbody>
-    </table>
+    </div>
     {% else %}
     <div class="empty-state">No sessions yet.</div>
     {% endif %}
   </section>
 
   <section class="profile-section">
-    <h3>comments</h3>
-    {% if comments %}
-    <ul class="profile-activity-list">
-      {% for c in comments %}
-      <li class="profile-activity-item">
-        <div class="profile-activity-meta muted">
-          on <a href="/post/{{ c.post_id }}#comment-{{ c.id }}">{{ c.post_title }}</a>
-          · {{ c.created_at | timeago }}
-          {% if c.vote_count != 0 %}· <span class="{{ 'pos' if c.vote_count > 0 else 'neg' }}">{{ '+' if c.vote_count > 0 else '' }}{{ c.vote_count }}</span>{% endif %}
+    <div class="profile-tabs-wrapper">
+      <input type="radio" id="ptab-c" name="ptab" {% if tab != 'votes' %}checked{% endif %} hidden>
+      <input type="radio" id="ptab-v" name="ptab" {% if tab == 'votes' %}checked{% endif %} hidden>
+      <div class="profile-tab-bar">
+        <label for="ptab-c">comments <span class="muted">{{ comment_total }}</span></label>
+        <label for="ptab-v">votes <span class="muted">{{ vote_total }}</span></label>
+      </div>
+      <div class="profile-tab-panel panel-ptab-c">
+        {% if comments %}
+        <div class="comment-list">
+          <div class="comment-header">
+            <span>post</span><span>score</span><span>age</span>
+          </div>
+          {% for c in comments %}
+          <div class="comment-row">
+            <a href="/post/{{ c.post_id }}#comment-{{ c.id }}">{{ c.post_title }}</a>
+            <span class="{% if c.vote_count > 0 %}pos{% elif c.vote_count < 0 %}neg{% else %}muted{% endif %}">
+              {%- if c.vote_count > 0 %}+{{ c.vote_count }}{% elif c.vote_count < 0 %}{{ c.vote_count }}{% else %}—{% endif -%}
+            </span>
+            <span class="muted">{{ c.created_at | timeshort }}</span>
+            <div class="comment-row-body">{{ c.body }}</div>
+          </div>
+          {% endfor %}
         </div>
-        <div class="profile-activity-body">{{ c.body }}</div>
-      </li>
-      {% endfor %}
-    </ul>
-    {{ paginate(comment_page, comment_pages, "cp", "ep=" ~ editorial_page ~ "&vp=" ~ vote_page) }}
-    {% else %}
-    <div class="empty-state">No comments yet.</div>
-    {% endif %}
-  </section>
-
-  <section class="profile-section">
-    <h3>votes</h3>
-    {% if votes %}
-    <ul class="profile-activity-list">
-      {% for v in votes %}
-      <li class="profile-activity-item">
-        <div class="profile-activity-meta muted">
-          <span class="vote-dir {{ 'pos' if v.direction == 1 else 'neg' }}">{{ '▲' if v.direction == 1 else '▼' }}</span>
-          {% if v.post_id %}
-            post: <a href="/post/{{ v.post_id }}">{{ v.post_title or v.post_id }}</a>
-          {% else %}
-            comment by {{ v.comment_author or '?' }} on <a href="/post/{{ v.comment_post_id }}">{{ v.comment_post_title or 'post' }}</a>
-          {% endif %}
-          · {{ v.created_at | timeago }}
+        {{ paginate(comment_page, comment_pages, "cp", "ep=" ~ editorial_page ~ "&vp=" ~ vote_page ~ "&tab=comments") }}
+        {% else %}
+        <div class="empty-state">No comments yet.</div>
+        {% endif %}
+      </div>
+      <div class="profile-tab-panel panel-ptab-v">
+        {% if votes %}
+        <div class="vote-list">
+          <div class="vote-header">
+            <span></span><span>target</span><span>age</span>
+          </div>
+          {% for v in votes %}
+          <div class="vote-row">
+            <span class="vote-dir {{ 'pos' if v.direction == 1 else 'neg' }}">{{ '▲' if v.direction == 1 else '▼' }}</span>
+            <span>
+              {%- if v.post_id -%}
+                <a href="/post/{{ v.post_id }}">{{ v.post_title or v.post_id }}</a>
+              {%- else -%}
+                {{ v.comment_author or '?' }} on <a href="/post/{{ v.comment_post_id }}">{{ v.comment_post_title or 'post' }}</a>
+              {%- endif -%}
+            </span>
+            <span class="muted">{{ v.created_at | timeshort }}</span>
+            {%- if v.reason or v.comment_body -%}
+            <div class="vote-row-body">{{ v.reason or '"' ~ v.comment_body[:120] ~ ('…' if v.comment_body | length > 120 else '"') }}</div>
+            {%- endif -%}
+          </div>
+          {% endfor %}
         </div>
-        {% if v.reason %}<div class="profile-activity-body muted">{{ v.reason }}</div>{% endif %}
-        {% if v.comment_id and v.comment_body %}<div class="profile-activity-body muted">"{{ v.comment_body[:120] }}{% if v.comment_body | length > 120 %}…{% endif %}"</div>{% endif %}
-      </li>
-      {% endfor %}
-    </ul>
-    {{ paginate(vote_page, vote_pages, "vp", "ep=" ~ editorial_page ~ "&cp=" ~ comment_page) }}
-    {% else %}
-    <div class="empty-state">No votes yet.</div>
-    {% endif %}
+        {{ paginate(vote_page, vote_pages, "vp", "ep=" ~ editorial_page ~ "&cp=" ~ comment_page ~ "&tab=votes") }}
+        {% else %}
+        <div class="empty-state">No votes yet.</div>
+        {% endif %}
+      </div>
+    </div>
   </section>
 
 </div>

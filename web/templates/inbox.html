@@ -8,11 +8,12 @@
   {% if unread_count %}
   <button
     id="mark-read-btn"
+    class="inbox-mark-all-btn"
     hx-post="/inbox/mark-read"
     hx-target="#inbox-badge"
     hx-swap="outerHTML"
     onclick="markAllRead()">
-    mark all as read
+    mark all read
   </button>
   {% endif %}
 </div>
@@ -29,16 +30,19 @@
   <ul class="inbox-list">
     {% for n in unread %}
     <li class="inbox-item unread" id="notif-{{ n.id }}">
-      <div class="inbox-meta">
-        <span class="inbox-avatar">{{ n.avatar_name }}</span>
-        replied to your comment on
-        <a href="/post/{{ n.post_id }}#comment-{{ n.comment_id }}">{{ n.post_title }}</a>
-        <span class="inbox-time" data-ts="{{ n.created_at }}"></span>
-        <button class="inbox-mark-read-btn"
-          hx-post="/inbox/mark-read/{{ n.id }}"
-          hx-target="closest li"
-          hx-swap="outerHTML"
-          hx-on::after-request="updateTabCount(-1)">✓</button>
+      <div class="inbox-item-header">
+        <div class="inbox-item-meta">
+          <a class="inbox-avatar" href="/profile/avatar/{{ n.avatar_id }}">{{ n.avatar_name }}</a>
+          <span class="inbox-item-context">on <a href="/post/{{ n.post_id }}#comment-{{ n.comment_id }}">{{ n.post_title }}</a></span>
+        </div>
+        <div class="inbox-item-actions">
+          <span class="inbox-time muted" data-ts="{{ n.created_at }}"></span>
+          <button class="inbox-mark-read-btn"
+            hx-post="/inbox/mark-read/{{ n.id }}"
+            hx-target="closest li"
+            hx-swap="outerHTML"
+            hx-on::after-request="updateTabCount(-1)">✓</button>
+        </div>
       </div>
       <div class="inbox-body">{{ n.body }}</div>
     </li>
@@ -54,11 +58,12 @@
   <ul class="inbox-list">
     {% for n in read %}
     <li class="inbox-item">
-      <div class="inbox-meta">
-        <span class="inbox-avatar">{{ n.avatar_name }}</span>
-        replied to your comment on
-        <a href="/post/{{ n.post_id }}#comment-{{ n.comment_id }}">{{ n.post_title }}</a>
-        <span class="inbox-time" data-ts="{{ n.created_at }}"></span>
+      <div class="inbox-item-header">
+        <div class="inbox-item-meta">
+          <a class="inbox-avatar" href="/profile/avatar/{{ n.avatar_id }}">{{ n.avatar_name }}</a>
+          <span class="inbox-item-context">on <a href="/post/{{ n.post_id }}#comment-{{ n.comment_id }}">{{ n.post_title }}</a></span>
+        </div>
+        <span class="inbox-time muted" data-ts="{{ n.created_at }}"></span>
       </div>
       <div class="inbox-body">{{ n.body }}</div>
     </li>
@@ -93,12 +98,12 @@
     if (count) count.remove();
   }
 
-  document.querySelectorAll('.inbox-time[data-ts]').forEach(function (el) {
+  document.querySelectorAll('.inbox-time[data-ts]').forEach(function(el) {
     const diff = Math.floor((Date.now() - new Date(el.dataset.ts + 'Z').getTime()) / 1000);
-    if (diff < 60) el.textContent = diff + 's ago';
-    else if (diff < 3600) el.textContent = Math.floor(diff / 60) + 'm ago';
-    else if (diff < 86400) el.textContent = Math.floor(diff / 3600) + 'h ago';
-    else el.textContent = Math.floor(diff / 86400) + 'd ago';
+    if (diff < 60) el.textContent = diff + 's';
+    else if (diff < 3600) el.textContent = Math.floor(diff / 60) + 'm';
+    else if (diff < 86400) el.textContent = Math.floor(diff / 3600) + 'h';
+    else el.textContent = Math.floor(diff / 86400) + 'd';
   });
 </script>
 {% endblock %}

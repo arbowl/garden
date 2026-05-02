@@ -119,7 +119,31 @@ _VERBOSITY_HINTS = {
 }
 
 
-def build_system_prompt(archetype: Archetype, drift: DriftVector, memory: Memory) -> str:
+_REL_PROMPT_LABELS = [
+    (4.0, "a close friend"),
+    (2.0, "someone you like"),
+    (1.0, "someone you're fond of"),
+    (-4.0, "your nemesis"),
+    (-2.0, "someone you dislike"),
+    (-1.0, "someone you're wary of"),
+]
+
+
+def _rel_prompt_label(score: float) -> str:
+    for threshold, label in _REL_PROMPT_LABELS:
+        if threshold > 0 and score >= threshold:
+            return label
+        if threshold < 0 and score <= threshold:
+            return label
+    return "someone you're wary of"
+
+
+def build_system_prompt(
+    archetype: Archetype,
+    drift: DriftVector,
+    memory: Memory,
+    relationships: list[dict] | None = None,
+) -> str:
     lines: list[str] = []
 
     lines.append(f"You are {archetype.name}, {archetype.role}.")
@@ -156,6 +180,21 @@ def build_system_prompt(archetype: Archetype, drift: DriftVector, memory: Memory
         lines.append("Your memory of recent activity:")
         lines.append(memory_block)
         lines.append("")
+
+    if relationships:
+        rel_lines = []
+        for rel in relationships:
+            name = rel["object_name"]
+            score = float(rel["score"])
+            label = _rel_prompt_label(score)
+            if score > 0:
+                rel_lines.append(f"You feel warmly toward {name} — you consider them {label}.")
+            else:
+                rel_lines.append(f"You have a negative feeling toward {name} — you consider them {label}.")
+        if rel_lines:
+            lines.append("Your feelings about other users:")
+            lines.extend(rel_lines)
+            lines.append("")
 
     verbosity_hint = _VERBOSITY_HINTS.get(archetype.verbosity, _VERBOSITY_HINTS["medium"])
     lines.append(verbosity_hint)

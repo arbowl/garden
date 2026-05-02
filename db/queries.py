@@ -469,6 +469,22 @@ async def get_recent_sessions(db: aiosqlite.Connection, limit: int = 20) -> list
     return [_row_to_session(r) for r in rows]
 
 
+async def get_last_session_per_instance(db: aiosqlite.Connection) -> dict[str, Session]:
+    async with db.execute(
+        """
+        SELECT s.*
+        FROM sessions s
+        INNER JOIN (
+            SELECT instance_id, MAX(started_at) AS latest
+            FROM sessions
+            GROUP BY instance_id
+        ) t ON s.instance_id = t.instance_id AND s.started_at = t.latest
+        """
+    ) as cur:
+        rows = await cur.fetchall()
+    return {r["instance_id"]: _row_to_session(r) for r in rows}
+
+
 async def get_pending_replies(
     db: aiosqlite.Connection,
     instance_id: str,
@@ -793,6 +809,60 @@ async def insert_comment(
     return comment_id
 
 
+_VOTE_WEIGHT = 0.3
+_REL_MAX = 5.0
+
+
+async def upsert_relationship(
+    db: aiosqlite.Connection,
+    subject_id: str,
+    object_id: str,
+    vote_delta: int,
+) -> None:
+    async with db.execute(
+        "SELECT score FROM relationships WHERE subject_id = ? AND object_id = ?",
+        (subject_id, object_id),
+    ) as cur:
+        row = await cur.fetchone()
+    current = float(row["score"]) if row else 0.0
+    effective_delta = vote_delta * _VOTE_WEIGHT * (1.0 - abs(current) / _REL_MAX)
+    new_score = max(-_REL_MAX, min(_REL_MAX, current + effective_delta))
+    await db.execute(
+        """
+        INSERT INTO relationships (subject_id, object_id, score, updated_at)
+        VALUES (?, ?, ?, datetime('now'))
+        ON CONFLICT(subject_id, object_id) DO UPDATE SET
+            score = excluded.score,
+            updated_at = datetime('now')
+        """,
+        (subject_id, object_id, new_score),
+    )
+
+
+async def _apply_comment_vote_relationship(
+    db: aiosqlite.Connection,
+    voter_id: str,
+    comment_id: int,
+    delta: int,
+) -> None:
+    async with db.execute(
+        "SELECT author_type, author_id FROM comments WHERE id = ?",
+        (comment_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    if not row:
+        return
+    author_type = row["author_type"]
+    author_id = row["author_id"]
+    if author_type == "avatar":
+        if author_id is None or author_id == voter_id:
+            return
+        object_id = author_id
+    else:
+        object_id = "human"
+    await upsert_relationship(db, voter_id, object_id, delta)
+
+
 async def insert_vote(
     db: aiosqlite.Connection,
     voter_type: AuthorType,
@@ -835,6 +905,8 @@ async def insert_vote(
                     "UPDATE comments SET vote_count = vote_count + ? WHERE id = ?",
                     (delta, comment_id),
                 )
+                if voter_type == AuthorType.AVATAR:
+                    await _apply_comment_vote_relationship(db, voter_id, comment_id, delta)
             await db.commit()
             return True
 
@@ -855,6 +927,8 @@ async def insert_vote(
             "UPDATE comments SET vote_count = vote_count + ? WHERE id = ?",
             (direction, comment_id),
         )
+        if voter_type == AuthorType.AVATAR and voter_id is not None:
+            await _apply_comment_vote_relationship(db, voter_id, comment_id, direction)
     await db.commit()
     return True
 
@@ -881,7 +955,12 @@ async def insert_notification(
 
 async def get_notifications(db: aiosqlite.Connection, limit: int = 100) -> list[dict]:
     async with db.execute(
-        "SELECT * FROM notifications ORDER BY created_at DESC LIMIT ?",
+        """
+        SELECT n.*, c.author_id AS avatar_id
+        FROM notifications n
+        LEFT JOIN comments c ON c.id = n.comment_id
+        ORDER BY n.created_at DESC LIMIT ?
+        """,
         (limit,),
     ) as cur:
         rows = await cur.fetchall()
@@ -937,6 +1016,15 @@ async def get_instance_comments(
 async def count_instance_comments(db: aiosqlite.Connection, instance_id: str) -> int:
     async with db.execute(
         "SELECT COUNT(*) FROM comments WHERE author_id = ? AND author_type = 'avatar'",
+        (instance_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    return row[0] if row else 0
+
+
+async def sum_instance_comment_votes(db: aiosqlite.Connection, instance_id: str) -> int:
+    async with db.execute(
+        "SELECT COALESCE(SUM(vote_count), 0) FROM comments WHERE author_id = ? AND author_type = 'avatar'",
         (instance_id,),
     ) as cur:
         row = await cur.fetchone()
@@ -1002,6 +1090,14 @@ async def get_human_comments(db: aiosqlite.Connection, limit: int = 25, offset: 
 async def count_human_comments(db: aiosqlite.Connection) -> int:
     async with db.execute(
         "SELECT COUNT(*) FROM comments WHERE author_type = 'human'",
+    ) as cur:
+        row = await cur.fetchone()
+    return row[0] if row else 0
+
+
+async def sum_human_comment_votes(db: aiosqlite.Connection) -> int:
+    async with db.execute(
+        "SELECT COALESCE(SUM(vote_count), 0) FROM comments WHERE author_type = 'human'",
     ) as cur:
         row = await cur.fetchone()
     return row[0] if row else 0
@@ -1364,3 +1460,67 @@ async def delete_comment_cascade(
     )
     await db.commit()
     return True
+
+
+# ── Relationship queries ──────────────────────────────────────────────────────
+
+_REL_LABELS = [
+    (4.0, "a close friend"),
+    (2.0, "someone they like"),
+    (1.0, "someone they're fond of"),
+    (-4.0, "their nemesis"),
+    (-2.0, "someone they dislike"),
+    (-1.0, "someone they're wary of"),
+]
+
+
+def _rel_label(score: float) -> str:
+    for threshold, label in _REL_LABELS:
+        if threshold > 0 and score >= threshold:
+            return label
+        if threshold < 0 and score <= threshold:
+            return label
+    return "someone they're wary of"
+
+
+async def get_relationships_for_prompt(
+    db: aiosqlite.Connection,
+    instance_id: str,
+) -> list[dict]:
+    """Relationships used for system prompt injection (abs >= 1.0), sorted by magnitude."""
+    async with db.execute(
+        """
+        SELECT r.object_id, r.score,
+               COALESCE(i.name, 'the human user') as object_name
+        FROM relationships r
+        LEFT JOIN instances i ON i.id = r.object_id
+        WHERE r.subject_id = ? AND ABS(r.score) >= 1.0
+        ORDER BY ABS(r.score) DESC
+        """,
+        (instance_id,),
+    ) as cur:
+        rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_profile_relationships(
+    db: aiosqlite.Connection,
+    instance_id: str,
+) -> dict:
+    """Best and worst relationship for profile display (abs >= 3.0)."""
+    async with db.execute(
+        """
+        SELECT r.object_id, r.score,
+               COALESCE(i.name, 'human') as object_name,
+               i.id as instance_id
+        FROM relationships r
+        LEFT JOIN instances i ON i.id = r.object_id
+        WHERE r.subject_id = ? AND ABS(r.score) >= 3.0
+        ORDER BY r.score DESC
+        """,
+        (instance_id,),
+    ) as cur:
+        rows = [dict(r) for r in await cur.fetchall()]
+    best = rows[0] if rows and rows[0]["score"] > 0 else None
+    worst = rows[-1] if rows and rows[-1]["score"] < 0 else None
+    return {"best": best, "worst": worst}

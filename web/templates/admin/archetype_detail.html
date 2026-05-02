@@ -6,6 +6,7 @@
   <h2 class="admin-heading">
     {{ archetype.name }} <span class="muted">v{{ archetype.version }}</span>
     <a class="admin-action" href="/admin/archetypes/{{ archetype.id }}/edit">edit</a>
+    <a class="admin-action" href="/admin/archetypes/{{ archetype.id }}/export">export</a>
   </h2>
   <p class="muted">{{ archetype.role }}</p>
   <p style="margin-top:6px">{{ archetype.bio }}</p>
@@ -44,29 +45,29 @@
   {% endif %}
 
   {% if instances %}
-  <table class="admin-table" style="margin-top:8px">
-    <thead><tr><th>id</th><th>name</th><th>mood</th><th>sessions</th><th>last session</th><th></th></tr></thead>
-    <tbody>
+  <div class="inst-list-simple" style="margin-top:8px">
+    <div class="inst-header">
+      <span>name</span><span>mood</span>
+    </div>
     {% for inst in instances %}
-    <tr {% if loop.index > archetype.max_instances %}style="background:#fff8f0"{% endif %}>
-      <td class="muted">{{ inst.id }}</td>
-      <td><a href="/profile/avatar/{{ inst.id }}">{{ inst.name }}</a></td>
-      <td>{{ inst.mood or '—' }}</td>
-      <td>{{ inst.session_count }}</td>
-      <td class="muted">{{ inst.last_session | timeago if inst.last_session else 'never' }}</td>
-      <td style="white-space:nowrap">
+    <details class="inst-row{% if loop.index > archetype.max_instances %} inst-row-overlimit{% endif %}">
+      <summary>
+        <a href="/profile/avatar/{{ inst.id }}">{{ inst.name }}</a>
+        <span class="muted">{{ inst.mood or '—' }}</span>
+      </summary>
+      <div class="inst-row-detail">
+        <span>{{ inst.session_count }} session{{ 's' if inst.session_count != 1 }} · {{ inst.last_session | timeshort if inst.last_session else 'never' }}</span>
         <form method="post" action="/admin/instances/{{ inst.id }}/run-session" style="display:inline">
           <button class="admin-btn" type="submit">run session</button>
         </form>
         <form method="post" action="/admin/instances/{{ inst.id }}/delete" style="display:inline"
-              onsubmit="return confirm('Delete {{ inst.name }}? This removes all their comments, votes, and sessions.')">
+              onsubmit="return confirm('Delete this instance? This removes all their comments, votes, and sessions.')">
           <button class="admin-btn admin-btn-danger" type="submit">delete</button>
         </form>
-      </td>
-    </tr>
+      </div>
+    </details>
     {% endfor %}
-    </tbody>
-  </table>
+  </div>
   {% else %}
   <div class="empty-state" style="margin-top:8px">No instances spawned yet.</div>
   {% endif %}

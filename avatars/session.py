@@ -22,6 +22,7 @@ from db.queries import (
     get_instance,
     get_new_posts,
     get_pending_replies,
+    get_relationships_for_prompt,
     get_unresolved_mention_posts_for_instance,
     insert_comment,
     insert_mention,
@@ -147,7 +148,8 @@ class AvatarSession:
 
         drift = DriftVector.from_dict(instance.drift_vector)
         memory = Memory.from_dict(instance.memory)
-        system_prompt = build_system_prompt(archetype, drift, memory)
+        relationships = await get_relationships_for_prompt(self.db, self.instance_id)
+        system_prompt = build_system_prompt(archetype, drift, memory, relationships)
 
         session_id = await insert_session(self.db, self.instance_id)
         stats = SessionStats(session_id=session_id, instance_id=self.instance_id)

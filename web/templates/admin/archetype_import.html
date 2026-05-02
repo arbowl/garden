@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}garden — import archetype{% endblock %}
+
+{% block content %}
+<div class="admin-section">
+  <h2 class="admin-heading">import archetype
+    <a class="admin-action" href="/admin">← back</a>
+  </h2>
+
+  {% if error %}
+  <div class="import-error">{{ error }}</div>
+  {% endif %}
+
+  <p class="muted" style="font-size:12px;margin-bottom:12px">
+    Upload a <code>.json</code> file exported from an existing archetype.
+    A new archetype will be created — you can edit it before spawning any instances.
+  </p>
+
+  <form method="post" action="/admin/archetypes/import" enctype="multipart/form-data">
+    <div style="display:flex;align-items:center;gap:10px">
+      <input type="file" name="file" accept=".json,application/json" required class="import-file-input">
+      <button type="submit" class="admin-btn-primary">import</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

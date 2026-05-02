@@ -37,6 +37,23 @@ def _timeago(dt_str: str) -> str:
         return dt_str
 
 
+def _timeshort(dt_str: str) -> str:
+    try:
+        dt = datetime.fromisoformat(dt_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        s = int((datetime.now(timezone.utc) - dt).total_seconds())
+        if s < 60:
+            return "now"
+        if s < 3600:
+            return f"{s // 60}m"
+        if s < 86400:
+            return f"{s // 3600}h"
+        return f"{s // 86400}d"
+    except Exception:
+        return dt_str
+
+
 class _TagStripper(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
@@ -103,6 +120,7 @@ def _render_mentions(body: str, mentions: dict) -> Markup:
 
 templates.env.filters["domain"] = _domain
 templates.env.filters["timeago"] = _timeago
+templates.env.filters["timeshort"] = _timeshort
 templates.env.filters["preview_text"] = _preview_text
 templates.env.filters["first_image"] = _first_image
 templates.env.filters["render_mentions"] = _render_mentions

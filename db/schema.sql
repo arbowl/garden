@@ -147,3 +147,13 @@ CREATE TABLE IF NOT EXISTS mentions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_mentions_instance ON mentions(instance_id, resolved);
+
+CREATE TABLE IF NOT EXISTS relationships (
+    subject_id TEXT NOT NULL,
+    object_id  TEXT NOT NULL,
+    score      REAL NOT NULL DEFAULT 0.0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (subject_id, object_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_relationships_subject ON relationships(subject_id);

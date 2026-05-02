@@ -1,7 +1,8 @@
+import json
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from avatars.schema import DriftVector, Memory
 from avatars.session import AvatarSession
@@ -17,7 +18,7 @@ from db.queries import (
     get_archetype,
     get_instance,
     get_instances_for_archetype,
-    get_recent_sessions,
+    get_last_session_per_instance,
     update_archetype,
 )
 from ingest.fetcher import fetch_source
@@ -35,7 +36,17 @@ async def dashboard(request: Request):
     post_counts = await count_posts_by_status(db)
     archetypes = await get_all_archetypes(db)
     instances = await get_all_instances(db)
-    sessions = await get_recent_sessions(db, limit=10)
+    last_sessions = await get_last_session_per_instance(db)
+
+    arch_inst_counts: dict[int, int] = {}
+    arch_last_ran: dict[int, str | None] = {}
+    for inst in instances:
+        arch_inst_counts[inst.archetype_id] = arch_inst_counts.get(inst.archetype_id, 0) + 1
+        if inst.last_session:
+            prev = arch_last_ran.get(inst.archetype_id)
+            if prev is None or inst.last_session > prev:
+                arch_last_ran[inst.archetype_id] = inst.last_session
+
     return templates.TemplateResponse(
         request,
         "admin/dashboard.html",
@@ -43,7 +54,9 @@ async def dashboard(request: Request):
             "post_counts": post_counts,
             "archetypes": archetypes,
             "instances": instances,
-            "sessions": sessions,
+            "last_sessions": last_sessions,
+            "arch_inst_counts": arch_inst_counts,
+            "arch_last_ran": arch_last_ran,
         },
     )
 
@@ -51,6 +64,102 @@ async def dashboard(request: Request):
 @router.get("/archetypes/new", response_class=HTMLResponse)
 async def archetype_new_form(request: Request):
     return templates.TemplateResponse(request, "admin/archetype_form.html", {"archetype": None})
+
+
+@router.get("/archetypes/import", response_class=HTMLResponse)
+async def archetype_import_form(request: Request):
+    return templates.TemplateResponse(request, "admin/archetype_import.html", {"error": None})
+
+
+@router.post("/archetypes/import")
+async def archetype_import(request: Request, file: UploadFile = File(...)):
+    content = await file.read()
+    try:
+        data = json.loads(content)
+    except Exception:
+        return templates.TemplateResponse(
+            request, "admin/archetype_import.html", {"error": "Could not parse file — make sure it's a valid garden archetype JSON."}
+        )
+
+    if data.get("garden_archetype") != "1":
+        return templates.TemplateResponse(
+            request, "admin/archetype_import.html", {"error": "File does not look like a garden archetype export."}
+        )
+
+    def _listfield(v):
+        if isinstance(v, list):
+            return [str(x) for x in v if x]
+        if isinstance(v, str):
+            return [x.strip() for x in v.split(",") if x.strip()]
+        return []
+
+    db = await get_db()
+    try:
+        archetype_id = await create_archetype(
+            db,
+            name=str(data.get("name", "imported")),
+            role=str(data.get("role", "")),
+            bio=str(data.get("bio", "")),
+            tone=data.get("tone") or None,
+            sentence_style=data.get("sentence_style") or None,
+            vocabulary_level=data.get("vocabulary_level") or None,
+            quirks=data.get("quirks") or None,
+            example_comment=data.get("example_comment") or None,
+            favors=_listfield(data.get("favors", [])),
+            dislikes=_listfield(data.get("dislikes", [])),
+            indifferent=_listfield(data.get("indifferent", [])),
+            vote_probability=float(data.get("vote_probability", 0.7)),
+            comment_threshold=float(data.get("comment_threshold", 0.5)),
+            reply_probability=float(data.get("reply_probability", 0.6)),
+            verbosity=str(data.get("verbosity", "medium")),
+            contrarian_factor=float(data.get("contrarian_factor", 0.1)),
+            temperature=float(data.get("temperature", 0.7)),
+            max_instances=int(data.get("max_instances", 1)),
+            new_post_bias=max(-1.0, min(1.0, float(data.get("new_post_bias", 0.0)))),
+        )
+    except Exception as e:
+        logger.exception("Failed to import archetype")
+        return templates.TemplateResponse(
+            request, "admin/archetype_import.html", {"error": f"Import failed: {e}"}
+        )
+
+    return RedirectResponse(url=f"/admin/archetypes/{archetype_id}", status_code=303)
+
+
+@router.get("/archetypes/{archetype_id}/export")
+async def archetype_export(archetype_id: int):
+    db = await get_db()
+    archetype = await get_archetype(db, archetype_id)
+    if not archetype:
+        raise HTTPException(status_code=404)
+    data = {
+        "garden_archetype": "1",
+        "name": archetype.name,
+        "role": archetype.role,
+        "bio": archetype.bio,
+        "tone": archetype.tone,
+        "sentence_style": archetype.sentence_style,
+        "vocabulary_level": archetype.vocabulary_level,
+        "quirks": archetype.quirks,
+        "example_comment": archetype.example_comment,
+        "favors": archetype.favors,
+        "dislikes": archetype.dislikes,
+        "indifferent": archetype.indifferent,
+        "vote_probability": archetype.vote_probability,
+        "comment_threshold": archetype.comment_threshold,
+        "reply_probability": archetype.reply_probability,
+        "verbosity": archetype.verbosity,
+        "contrarian_factor": archetype.contrarian_factor,
+        "temperature": archetype.temperature,
+        "max_instances": archetype.max_instances,
+        "new_post_bias": archetype.new_post_bias,
+    }
+    filename = archetype.name.lower().replace(" ", "-") + ".json"
+    return Response(
+        content=json.dumps(data, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/archetypes/{archetype_id}/edit", response_class=HTMLResponse)

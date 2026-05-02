@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}your profile — garden{% endblock %}
 
-{% macro paginate(page, pages, param, other_param) %}
+{% macro paginate(page, pages, param, other_params) %}
 {% if pages > 1 %}
 <div class="profile-pagination">
-  {% if page > 1 %}<a href="?{{ other_param }}&{{ param }}={{ page - 1 }}">← newer</a>{% endif %}
+  {% if page > 1 %}<a href="?{{ other_params }}&{{ param }}={{ page - 1 }}">← newer</a>{% endif %}
   <span class="muted">{{ page }} / {{ pages }}</span>
-  {% if page < pages %}<a href="?{{ other_param }}&{{ param }}={{ page + 1 }}">older →</a>{% endif %}
+  {% if page < pages %}<a href="?{{ other_params }}&{{ param }}={{ page + 1 }}">older →</a>{% endif %}
 </div>
 {% endif %}
 {% endmacro %}
@@ -16,58 +16,67 @@
   <div class="profile-title"><h2>you</h2></div>
   <div class="profile-stats">
     <div class="stat-box"><span class="stat-num">{{ comment_total }}</span><span class="stat-label">comments</span></div>
-    <div class="stat-box"><span class="stat-num">{{ vote_total }}</span><span class="stat-label">votes</span></div>
+    <div class="stat-box"><span class="stat-num">{{ vote_total }}</span><span class="stat-label">votes cast</span></div>
+    <div class="stat-box"><span class="stat-num">{{ karma }}</span><span class="stat-label">karma</span></div>
   </div>
 </div>
 
-<div class="profile-sections">
-
-  <section class="profile-section">
-    <h3>comments</h3>
+<div class="profile-tabs-wrapper">
+  <input type="radio" id="ptab-c" name="ptab" {% if tab != 'votes' %}checked{% endif %} hidden>
+  <input type="radio" id="ptab-v" name="ptab" {% if tab == 'votes' %}checked{% endif %} hidden>
+  <div class="profile-tab-bar">
+    <label for="ptab-c">comments <span class="muted">{{ comment_total }}</span></label>
+    <label for="ptab-v">votes <span class="muted">{{ vote_total }}</span></label>
+  </div>
+  <div class="profile-tab-panel panel-ptab-c">
     {% if comments %}
-    <ul class="profile-activity-list">
+    <div class="comment-list">
+      <div class="comment-header">
+        <span>post</span><span>score</span><span>age</span>
+      </div>
       {% for c in comments %}
-      <li class="profile-activity-item">
-        <div class="profile-activity-meta muted">
-          on <a href="/post/{{ c.post_id }}#comment-{{ c.id }}">{{ c.post_title }}</a>
-          · {{ c.created_at | timeago }}
-          {% if c.vote_count != 0 %}· <span class="{{ 'pos' if c.vote_count > 0 else 'neg' }}">{{ '+' if c.vote_count > 0 else '' }}{{ c.vote_count }}</span>{% endif %}
-          {% if c.has_reply %}<span class="replied-badge">replied</span>{% endif %}
-        </div>
-        <div class="profile-activity-body">{{ c.body }}</div>
-      </li>
+      <div class="comment-row">
+        <a href="/post/{{ c.post_id }}#comment-{{ c.id }}">{{ c.post_title }}</a>
+        <span class="{% if c.vote_count > 0 %}pos{% elif c.vote_count < 0 %}neg{% else %}muted{% endif %}">
+          {%- if c.vote_count > 0 %}+{{ c.vote_count }}{% elif c.vote_count < 0 %}{{ c.vote_count }}{% else %}—{% endif -%}
+        </span>
+        <span class="muted">{{ c.created_at | timeshort }}</span>
+        <div class="comment-row-body">{{ c.body }}</div>
+      </div>
       {% endfor %}
-    </ul>
-    {{ paginate(comment_page, comment_pages, "cp", "vp=" ~ vote_page) }}
+    </div>
+    {{ paginate(comment_page, comment_pages, "cp", "vp=" ~ vote_page ~ "&tab=comments") }}
     {% else %}
     <div class="empty-state">You haven't commented yet.</div>
     {% endif %}
-  </section>
-
-  <section class="profile-section">
-    <h3>votes</h3>
+  </div>
+  <div class="profile-tab-panel panel-ptab-v">
     {% if votes %}
-    <ul class="profile-activity-list">
+    <div class="vote-list">
+      <div class="vote-header">
+        <span></span><span>target</span><span>age</span>
+      </div>
       {% for v in votes %}
-      <li class="profile-activity-item">
-        <div class="profile-activity-meta muted">
-          <span class="vote-dir {{ 'pos' if v.direction == 1 else 'neg' }}">{{ '▲' if v.direction == 1 else '▼' }}</span>
-          {% if v.post_id %}
-            post: <a href="/post/{{ v.post_id }}">{{ v.post_title or v.post_id }}</a>
-          {% else %}
-            comment by {{ v.comment_author or '?' }}
-            {% if v.comment_body %}<span class="muted">— "{{ v.comment_body[:80] }}{% if v.comment_body | length > 80 %}…{% endif %}"</span>{% endif %}
-          {% endif %}
-          · {{ v.created_at | timeago }}
-        </div>
-      </li>
+      <div class="vote-row">
+        <span class="vote-dir {{ 'pos' if v.direction == 1 else 'neg' }}">{{ '▲' if v.direction == 1 else '▼' }}</span>
+        <span>
+          {%- if v.post_id -%}
+            <a href="/post/{{ v.post_id }}">{{ v.post_title or v.post_id }}</a>
+          {%- else -%}
+            {{ v.comment_author or '?' }} on <a href="/post/{{ v.comment_post_id }}">{{ v.comment_post_title or 'post' }}</a>
+          {%- endif -%}
+        </span>
+        <span class="muted">{{ v.created_at | timeshort }}</span>
+        {%- if v.reason or v.comment_body -%}
+        <div class="vote-row-body">{{ v.reason or '"' ~ v.comment_body[:120] ~ ('…' if v.comment_body | length > 120 else '"') }}</div>
+        {%- endif -%}
+      </div>
       {% endfor %}
-    </ul>
-    {{ paginate(vote_page, vote_pages, "vp", "cp=" ~ comment_page) }}
+    </div>
+    {{ paginate(vote_page, vote_pages, "vp", "cp=" ~ comment_page ~ "&tab=votes") }}
     {% else %}
     <div class="empty-state">You haven't voted yet.</div>
     {% endif %}
-  </section>
-
+  </div>
 </div>
 {% endblock %}

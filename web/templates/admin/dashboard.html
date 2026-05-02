@@ -27,81 +27,80 @@
   </div>
 </div>
 
-<div class="admin-section">
-  <h2 class="admin-heading">archetypes
-    <a class="admin-action" href="/admin/archetypes/new">+ new</a>
-  </h2>
-  {% if archetypes %}
-  <table class="admin-table">
-    <thead><tr><th>name</th><th>role</th><th>instances</th><th>created</th><th></th></tr></thead>
-    <tbody>
-    {% for a in archetypes %}
-    <tr>
-      <td><a href="/admin/archetypes/{{ a.id }}">{{ a.name }}</a></td>
-      <td class="muted">{{ a.role }}</td>
-      <td>{{ a.max_instances }}</td>
-      <td class="muted">{{ a.created_at | timeago }}</td>
-      <td><a href="/admin/archetypes/{{ a.id }}">view →</a></td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="empty-state">No archetypes yet. <a href="/admin/archetypes/new">Create one.</a></div>
-  {% endif %}
-</div>
+<div class="admin-tabs-wrapper">
+  <input type="radio" id="tab-arc" name="admin-tab" checked hidden>
+  <input type="radio" id="tab-inst" name="admin-tab" hidden>
 
-<div class="admin-section">
-  <h2 class="admin-heading">instances</h2>
-  {% if instances %}
-  <table class="admin-table">
-    <thead><tr><th>name</th><th>mood</th><th>sessions</th><th>last session</th><th></th></tr></thead>
-    <tbody>
-    {% for inst in instances %}
-    <tr>
-      <td><a href="/profile/avatar/{{ inst.id }}">{{ inst.name }}</a> <span class="muted">({{ inst.id }})</span></td>
-      <td>{{ inst.mood or '—' }}</td>
-      <td>{{ inst.session_count }}</td>
-      <td class="muted">{{ inst.last_session | timeago if inst.last_session else 'never' }}</td>
-      <td>
-        <form method="post" action="/admin/instances/{{ inst.id }}/run-session" style="display:inline">
-          <button class="admin-btn" type="submit">run session</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="empty-state">No instances yet. Create an archetype and spawn one.</div>
-  {% endif %}
-</div>
+  <div class="admin-tab-bar">
+    <label for="tab-arc">archetypes <a class="admin-action" href="/admin/archetypes/new">+ new</a> <a class="admin-action" href="/admin/archetypes/import">↑ import</a></label>
+    <label for="tab-inst">instances</label>
+  </div>
 
-<div class="admin-section">
-  <h2 class="admin-heading">recent sessions</h2>
-  {% if sessions %}
-  <table class="admin-table">
-    <thead><tr><th>instance</th><th>started</th><th>triaged</th><th>engaged</th><th>comments</th><th>votes</th><th>status</th></tr></thead>
-    <tbody>
-    {% for s in sessions %}
-    <tr>
-      <td class="muted">{{ s.instance_id }}</td>
-      <td class="muted">{{ s.started_at | timeago }}</td>
-      <td>{{ s.posts_triaged }}</td>
-      <td>{{ s.posts_engaged }}</td>
-      <td>{{ s.comments_made }}</td>
-      <td>{{ s.votes_cast }}</td>
-      <td>
-        {% if s.error %}<span class="badge-error">error</span>
-        {% elif s.ended_at %}<span class="badge-ok">{{ s.phase or 'done' }}</span>
-        {% else %}<span class="badge-running">{{ s.phase or 'running' }}</span>{% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="empty-state">No sessions yet.</div>
-  {% endif %}
+  <div class="admin-tab-panel panel-arc">
+    {% if archetypes %}
+    <div class="arch-list">
+      <div class="arch-header">
+        <span>name</span>
+        <span>instances</span>
+        <span>last ran</span>
+        <span></span>
+      </div>
+      {% for a in archetypes %}
+      <div class="arch-row">
+        <a href="/admin/archetypes/{{ a.id }}">{{ a.name }}</a>
+        <span class="muted">{{ arch_inst_counts.get(a.id, 0) }}/{{ a.max_instances }}</span>
+        <span class="muted">{{ arch_last_ran[a.id] | timeshort if a.id in arch_last_ran else '—' }}</span>
+        <a href="/admin/archetypes/{{ a.id }}">view →</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">No archetypes yet. <a href="/admin/archetypes/new">Create one.</a></div>
+    {% endif %}
+  </div>
+
+  <div class="admin-tab-panel panel-inst">
+    {% if instances %}
+    <div class="inst-list">
+      <div class="inst-header">
+        <span>name</span>
+        <span>mood</span>
+        <span>last session</span>
+        <span>status</span>
+      </div>
+      {% for inst in instances %}
+      {% set s = last_sessions.get(inst.id) %}
+      <details class="inst-row">
+        <summary>
+          <a href="/profile/avatar/{{ inst.id }}">{{ inst.name }}</a>
+          <span class="muted">{{ inst.mood or '—' }}</span>
+          <span class="muted">
+            {%- if s -%}
+              {{ s.posts_triaged }}t · {{ s.posts_engaged }}e · {{ s.comments_made }}c · {{ s.votes_cast }}v
+            {%- else -%}—{%- endif -%}
+          </span>
+          <span>
+            {%- if s -%}
+              {%- if s.error -%}<span class="badge-error">error</span>
+              {%- elif s.ended_at -%}<span class="badge-ok">{{ s.phase or 'done' }}</span>
+              {%- else -%}<span class="badge-running">{{ s.phase or 'running' }}</span>
+              {%- endif -%}
+            {%- endif -%}
+          </span>
+        </summary>
+        <div class="inst-row-detail">
+          {{ inst.session_count }} session{{ 's' if inst.session_count != 1 }} total · last run {{ inst.last_session | timeshort if inst.last_session else 'never' }}
+          <form method="post" action="/admin/instances/{{ inst.id }}/run-session" style="display:inline">
+            <button class="admin-btn" type="submit">run session</button>
+          </form>
+        </div>
+      </details>
+      {% endfor %}
+      <div class="inst-key">t = triaged · e = engaged · c = comments · v = votes</div>
+    </div>
+    {% else %}
+    <div class="empty-state">No instances yet. Create an archetype and spawn one.</div>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

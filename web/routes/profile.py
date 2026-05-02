@@ -16,6 +16,9 @@ from db.queries import (
     get_instance_comments,
     get_instance_sessions,
     get_instance_votes,
+    get_profile_relationships,
+    sum_human_comment_votes,
+    sum_instance_comment_votes,
     update_instance,
 )
 from web.templating import templates
@@ -26,7 +29,7 @@ _PER_PAGE = 25
 
 
 @router.get("/avatar/{instance_id}", response_class=HTMLResponse)
-async def avatar_profile(request: Request, instance_id: str, ep: int = 1, cp: int = 1, vp: int = 1):
+async def avatar_profile(request: Request, instance_id: str, ep: int = 1, cp: int = 1, vp: int = 1, tab: str = "comments"):
     db = await get_db()
     instance = await get_instance(db, instance_id)
     if not instance:
@@ -36,6 +39,7 @@ async def avatar_profile(request: Request, instance_id: str, ep: int = 1, cp: in
 
     comment_total = await count_instance_comments(db, instance_id)
     vote_total = await count_instance_votes(db, instance_id)
+    karma = await sum_instance_comment_votes(db, instance_id)
     comments = await get_instance_comments(db, instance_id, limit=_PER_PAGE, offset=(cp - 1) * _PER_PAGE)
     votes = await get_instance_votes(db, instance_id, limit=_PER_PAGE, offset=(vp - 1) * _PER_PAGE)
     comment_pages = max(1, -(-comment_total // _PER_PAGE))
@@ -47,6 +51,7 @@ async def avatar_profile(request: Request, instance_id: str, ep: int = 1, cp: in
         db, instance_id, limit=per_page, offset=(ep - 1) * per_page
     )
     editorial_pages = max(1, -(-editorial_total // per_page))
+    relationships = await get_profile_relationships(db, instance_id)
     return templates.TemplateResponse(
         request,
         "profile/avatar.html",
@@ -62,10 +67,13 @@ async def avatar_profile(request: Request, instance_id: str, ep: int = 1, cp: in
             "vote_total": vote_total,
             "vote_page": vp,
             "vote_pages": vote_pages,
+            "karma": karma,
             "editorials": editorials,
             "editorial_page": ep,
             "editorial_pages": editorial_pages,
             "editorial_total": editorial_total,
+            "relationships": relationships,
+            "tab": tab,
         },
     )
 
@@ -108,10 +116,11 @@ async def avatar_edit(
 
 
 @router.get("/you", response_class=HTMLResponse)
-async def human_profile(request: Request, cp: int = 1, vp: int = 1):
+async def human_profile(request: Request, cp: int = 1, vp: int = 1, tab: str = "comments"):
     db = await get_db()
     comment_total = await count_human_comments(db)
     vote_total = await count_human_votes(db)
+    karma = await sum_human_comment_votes(db)
     comments = await get_human_comments(db, limit=_PER_PAGE, offset=(cp - 1) * _PER_PAGE)
     votes = await get_human_votes(db, limit=_PER_PAGE, offset=(vp - 1) * _PER_PAGE)
     comment_pages = max(1, -(-comment_total // _PER_PAGE))
@@ -128,5 +137,7 @@ async def human_profile(request: Request, cp: int = 1, vp: int = 1):
             "vote_total": vote_total,
             "vote_page": vp,
             "vote_pages": vote_pages,
+            "karma": karma,
+            "tab": tab,
         },
     )
