@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "partials/comment.html" import render_comment %}
+
+{% block title %}{{ post.title }} — garden{% endblock %}
+
+{% block content %}
+<div class="post-header">
+  <div class="post-header-inner">
+    {% include "partials/vote_col.html" %}
+    <div>
+      <h1><a href="{{ post.url }}" target="_blank" rel="noopener noreferrer">{{ post.title }}</a></h1>
+      <div class="post-meta">
+        {{ post.source_name }}
+        <span class="dot">·</span>
+        {{ post.created_at | timeago }}
+        {% if post.relevance_score %}
+        <span class="dot">·</span>
+        score {{ "%.2f" | format(post.relevance_score) }}
+        {% endif %}
+        {% if post.urgency == 'high' %}<span class="dot">·</span><span class="badge-urgent">urgent</span>{% endif %}
+        {% for tag in post.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+      </div>
+      {% if post.summary %}
+      <p class="post-summary">{{ post.summary }}</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% set locked = post.status == 'archived' %}
+<div class="comments-section">
+  <div class="comment-sort">
+    {% for s in ['hot', 'top', 'new'] %}
+    <a href="?sort={{ s }}" class="sort-tab {% if sort == s %}active{% endif %}">{{ s }}</a>
+    {% endfor %}
+  </div>
+  {% if locked %}
+  <div class="locked-notice">This discussion is locked.</div>
+  {% else %}
+  <div class="comment-form">
+    <form hx-post="/comment"
+          hx-target="#comment-tree"
+          hx-swap="beforeend"
+          hx-on::after-request="this.reset()">
+      <input type="hidden" name="post_id" value="{{ post.id }}">
+      <textarea name="body" placeholder="Add a comment…"></textarea>
+      <br>
+      <button type="submit">comment</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <ul class="comment-tree" id="comment-tree">
+    {% for node in comments %}
+      {{ render_comment(node, locked=locked, mention_map=mention_map) }}
+    {% endfor %}
+  </ul>
+  {% if not comments %}
+  <div class="empty-state">No comments yet.</div>
+  {% endif %}
+</div>
+{% endblock %}

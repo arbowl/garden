@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}inbox — garden{% endblock %}
+
+{% block content %}
+<div class="inbox-header">
+  <h2>inbox</h2>
+  {% if unread_count %}
+  <button
+    id="mark-read-btn"
+    hx-post="/inbox/mark-read"
+    hx-target="#inbox-badge"
+    hx-swap="outerHTML"
+    onclick="markAllRead()">
+    mark all as read
+  </button>
+  {% endif %}
+</div>
+
+<div class="inbox-tabs">
+  <button class="inbox-tab active" id="tab-unread" onclick="switchTab('unread')">
+    unread{% if unread_count %} <span class="inbox-tab-count">{{ unread_count }}</span>{% endif %}
+  </button>
+  <button class="inbox-tab" id="tab-read" onclick="switchTab('read')">read</button>
+</div>
+
+<div id="panel-unread">
+  {% if unread %}
+  <ul class="inbox-list">
+    {% for n in unread %}
+    <li class="inbox-item unread" id="notif-{{ n.id }}">
+      <div class="inbox-meta">
+        <span class="inbox-avatar">{{ n.avatar_name }}</span>
+        replied to your comment on
+        <a href="/post/{{ n.post_id }}#comment-{{ n.comment_id }}">{{ n.post_title }}</a>
+        <span class="inbox-time" data-ts="{{ n.created_at }}"></span>
+        <button class="inbox-mark-read-btn"
+          hx-post="/inbox/mark-read/{{ n.id }}"
+          hx-target="closest li"
+          hx-swap="outerHTML"
+          hx-on::after-request="updateTabCount(-1)">✓</button>
+      </div>
+      <div class="inbox-body">{{ n.body }}</div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="inbox-empty">No unread replies.</p>
+  {% endif %}
+</div>
+
+<div id="panel-read" style="display:none">
+  {% if read %}
+  <ul class="inbox-list">
+    {% for n in read %}
+    <li class="inbox-item">
+      <div class="inbox-meta">
+        <span class="inbox-avatar">{{ n.avatar_name }}</span>
+        replied to your comment on
+        <a href="/post/{{ n.post_id }}#comment-{{ n.comment_id }}">{{ n.post_title }}</a>
+        <span class="inbox-time" data-ts="{{ n.created_at }}"></span>
+      </div>
+      <div class="inbox-body">{{ n.body }}</div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="inbox-empty">No read replies.</p>
+  {% endif %}
+</div>
+
+<script>
+  function switchTab(name) {
+    document.getElementById('panel-unread').style.display = name === 'unread' ? '' : 'none';
+    document.getElementById('panel-read').style.display = name === 'read' ? '' : 'none';
+    document.getElementById('tab-unread').classList.toggle('active', name === 'unread');
+    document.getElementById('tab-read').classList.toggle('active', name === 'read');
+  }
+
+  function updateTabCount(delta) {
+    const count = document.querySelector('#tab-unread .inbox-tab-count');
+    if (!count) return;
+    const n = (parseInt(count.textContent) || 0) + delta;
+    if (n <= 0) count.remove();
+    else count.textContent = n;
+  }
+
+  function markAllRead() {
+    document.querySelectorAll('.inbox-item.unread').forEach(function(el) { el.classList.remove('unread'); });
+    var btn = document.getElementById('mark-read-btn');
+    if (btn) btn.style.display = 'none';
+    var count = document.querySelector('#tab-unread .inbox-tab-count');
+    if (count) count.remove();
+  }
+
+  document.querySelectorAll('.inbox-time[data-ts]').forEach(function (el) {
+    const diff = Math.floor((Date.now() - new Date(el.dataset.ts + 'Z').getTime()) / 1000);
+    if (diff < 60) el.textContent = diff + 's ago';
+    else if (diff < 3600) el.textContent = Math.floor(diff / 60) + 'm ago';
+    else if (diff < 86400) el.textContent = Math.floor(diff / 3600) + 'h ago';
+    else el.textContent = Math.floor(diff / 86400) + 'd ago';
+  });
+</script>
+{% endblock %}

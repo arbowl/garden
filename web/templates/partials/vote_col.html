@@ -1,0 +1,15 @@
+<div id="vote-col-{{ post.id }}" class="vote-col">
+  <button class="vote-btn"
+    hx-post="/vote"
+    hx-vals='{"post_id": "{{ post.id }}", "direction": "1"}'
+    hx-target="#vote-col-{{ post.id }}"
+    hx-swap="outerHTML"
+    title="upvote">▲</button>
+  <span class="vote-count" title="{{ post.vote_count }} vote{{ 's' if post.vote_count != 1 else '' }}">{{ (post.vote_count + post.engagement_score) | round | int }}</span>
+  <button class="vote-btn"
+    hx-post="/vote"
+    hx-vals='{"post_id": "{{ post.id }}", "direction": "-1"}'
+    hx-target="#vote-col-{{ post.id }}"
+    hx-swap="outerHTML"
+    title="downvote">▼</button>
+</div>

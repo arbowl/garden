@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}garden — {{ sort }}{% endblock %}
+
+{% block content %}
+<div class="sort-tabs">
+  <a href="/" class="{{ 'active' if sort == 'hot' else '' }}">hot</a>
+  <a href="/top" class="{{ 'active' if sort == 'top' else '' }}">top</a>
+  <a href="/new" class="{{ 'active' if sort == 'new' else '' }}">new</a>
+</div>
+{% if sort == 'top' %}
+<div class="sort-tabs top-period-tabs">
+  <a href="/top?since=24h" class="{{ 'active' if since == '24h' else '' }}">24h</a>
+  <a href="/top?since=7d" class="{{ 'active' if since == '7d' else '' }}">7d</a>
+  <a href="/top?since=30d" class="{{ 'active' if since == '30d' else '' }}">30d</a>
+  <a href="/top?since=all" class="{{ 'active' if since == 'all' else '' }}">all</a>
+</div>
+{% endif %}
+
+{% if posts %}
+<ol class="post-list">
+  {% for post in posts %}
+  <li class="post-row">
+    <span class="post-rank">{{ (page - 1) * 25 + loop.index }}</span>
+    {% include "partials/vote_col.html" %}
+    <div class="post-main">
+      <div class="post-title">
+        <a href="{{ post.url }}" target="_blank" rel="noopener noreferrer">{{ post.title }}</a>
+        <span class="post-domain">({{ post.url | domain }})</span>
+      </div>
+      <div class="post-meta">
+        {% if post.urgency == 'high' %}<span class="badge-urgent">urgent</span><span class="dot">·</span>{% endif %}
+        {% for tag in post.tags[:3] %}<span class="tag">{{ tag }}</span>{% endfor %}
+        {% if post.tags %}<span class="dot">·</span>{% endif %}
+        {{ post.source_name }}
+        <span class="dot">·</span>
+        {{ post.created_at | timeago }}
+        <span class="dot">·</span>
+        <a href="/post/{{ post.id }}">{{ post.comment_count }} comment{{ 's' if post.comment_count != 1 else '' }}</a>
+      </div>
+      {% set preview = post.raw_content | preview_text %}
+      {% if preview %}
+      <details class="post-preview">
+        <summary class="post-preview-toggle">preview</summary>
+        <p class="post-preview-body">{{ preview }}</p>
+      </details>
+      {% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<div class="empty-state">No posts yet — run the fetcher to populate the garden.</div>
+{% endif %}
+
+{% if page > 1 or has_next %}
+{% set page_base = '?since=' ~ since ~ '&' if sort == 'top' else '?' %}
+<div class="pagination">
+  {% if page > 1 %}
+  <a href="{{ page_base }}page={{ page - 1 }}" class="page-btn">‹ prev</a>
+  {% else %}
+  <span class="page-btn disabled">‹ prev</span>
+  {% endif %}
+  <span class="page-num">page {{ page }}</span>
+  {% if has_next %}
+  <a href="{{ page_base }}page={{ page + 1 }}" class="page-btn">next ›</a>
+  {% else %}
+  <span class="page-btn disabled">next ›</span>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

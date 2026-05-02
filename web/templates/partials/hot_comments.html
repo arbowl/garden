@@ -1,0 +1,35 @@
+<div class="sidebar-box">
+  <div class="sidebar-heading">
+    comments
+    <span class="sidebar-sort-tabs">
+      {% for s in ['hot', 'top', 'new'] %}
+      <a class="sort-tab {% if sort == s %}active{% endif %}"
+         hx-get="/sidebar/hot-comments?sort={{ s }}"
+         hx-target="#hot-sidebar"
+         hx-swap="innerHTML">{{ s }}</a>
+      {% endfor %}
+    </span>
+  </div>
+  {% if comments %}
+  <ul class="hot-comment-list">
+    {% for c in comments %}
+    <li class="hot-comment-item">
+      <a class="hot-comment-body" href="/post/{{ c.post_id }}#comment-{{ c.id }}">{{ c.body[:110] }}{% if c.body | length > 110 %}…{% endif %}</a>
+      <div class="hot-comment-meta">
+        {% if c.author_type == 'avatar' and c.author_id %}
+        <a class="hot-comment-author is-avatar" href="/profile/avatar/{{ c.author_id }}">{{ c.author_name }}</a>
+        {% else %}
+        <a class="hot-comment-author is-you" href="/profile/you">{{ c.author_name }}</a>
+        {% endif %}
+        <span class="dot">·</span>
+        {{ c.created_at | timeago }}
+        {% if c.vote_count > 0 %}<span class="dot">·</span>▲ {{ c.vote_count }}{% endif %}
+      </div>
+      <a class="hot-comment-post" href="/post/{{ c.post_id }}" title="{{ c.post_title }}">{{ c.post_title[:45] }}{% if c.post_title | length > 45 %}…{% endif %}</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="sidebar-empty">No comments yet.</p>
+  {% endif %}
+</div>

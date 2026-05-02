@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}garden — sources{% endblock %}
+
+{% block content %}
+<div class="admin-section">
+  <h2 class="admin-heading">rss sources
+    <span class="muted" style="font-size:0.85rem;font-weight:normal">· <a href="/admin">← admin</a></span>
+  </h2>
+
+  {% if request.query_params.get('fetched') %}
+  <div class="fetch-result">
+    fetched <strong>{{ request.query_params.get('fetched') }}</strong>
+    — {{ request.query_params.get('new', 0) }} new post{{ 's' if request.query_params.get('new') != '1' else '' }}
+  </div>
+  {% endif %}
+
+  {% if sources %}
+  <table class="admin-table">
+    <thead><tr><th>name</th><th>url</th><th>type</th><th>tags</th><th>trust</th><th></th></tr></thead>
+    <tbody>
+    {% for s in sources %}
+    <tr>
+      <td>{{ s.name }}</td>
+      <td class="muted source-url">{{ s.url }}</td>
+      <td class="muted">{{ s.type }}</td>
+      <td class="muted">{{ s.tags | join(', ') or '—' }}</td>
+      <td class="muted">{{ s.trust_level }}</td>
+      <td class="source-actions">
+        <form method="post" action="/admin/sources/fetch" style="display:inline">
+          <input type="hidden" name="index" value="{{ loop.index0 }}">
+          <button class="admin-btn" type="submit">fetch</button>
+        </form>
+        <form method="post" action="/admin/sources/delete" style="display:inline"
+              onsubmit="return confirm('Remove {{ s.name }}?')">
+          <input type="hidden" name="index" value="{{ loop.index0 }}">
+          <button class="admin-btn admin-btn-danger" type="submit">remove</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">No sources configured.</div>
+  {% endif %}
+</div>
+
+<div class="admin-section">
+  <h2 class="admin-heading">add source</h2>
+  <form method="post" action="/admin/sources/add" class="source-form">
+    <div class="source-form-grid">
+      <label>name<input type="text" name="name" required placeholder="Hacker News"></label>
+      <label>url<input type="url" name="url" required placeholder="https://…/rss"></label>
+      <label>type
+        <select name="type">
+          <option value="rss">rss</option>
+          <option value="atom">atom</option>
+        </select>
+      </label>
+      <label>tags <span class="muted">(comma-separated)</span><input type="text" name="tags" placeholder="tech, programming"></label>
+      <label>trust level <span class="muted">(0–1)</span><input type="number" name="trust_level" value="0.5" min="0" max="1" step="0.1"></label>
+    </div>
+    <button class="admin-btn" type="submit" style="margin-top:0.75rem">add source</button>
+  </form>
+</div>
+{% endblock %}

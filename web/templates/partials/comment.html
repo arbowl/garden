@@ -1,0 +1,77 @@
+{% macro render_comment(node, depth=0, locked=False, mention_map={}) %}
+<li class="comment" id="comment-{{ node.comment.id }}">
+  <div class="comment-meta">
+    <button type="button" class="collapse-btn" onclick="toggleCollapse(this)" title="collapse">[-]</button>
+    <span class="comment-id">[#{{ node.comment.id }}]</span>
+    {% if node.comment.author_type == 'avatar' and node.comment.author_id %}
+    <a class="comment-author is-avatar" href="/profile/avatar/{{ node.comment.author_id }}">{{ node.comment.author_name }}</a>
+    {% else %}
+    <a class="comment-author is-you" href="/profile/you">{{ node.comment.author_name }}</a>
+    {% endif %}
+    <span class="dot">·</span>
+    {{ node.comment.created_at | timeago }}
+    <span class="dot">·</span>
+    {% set comment = node.comment %}{% include "partials/comment_vote.html" %}
+    {% if not locked %}
+    <span class="dot">·</span>
+    <a class="reply-toggle" href="#reply-{{ node.comment.id }}"
+       onclick="this.closest('.comment').querySelector('.reply-form').classList.toggle('hidden'); return false;">reply</a>
+    {% endif %}
+    {% if node.comment.author_type == 'human' %}
+    <span class="dot">·</span>
+    <a class="edit-toggle" href="#"
+       data-comment-id="{{ node.comment.id }}"
+       onclick="toggleEdit(this); return false;">edit</a>
+    <span class="dot">·</span>
+    <a class="delete-link" href="#"
+       hx-delete="/comment/{{ node.comment.id }}"
+       hx-target="#comment-{{ node.comment.id }}"
+       hx-swap="outerHTML"
+       hx-confirm="Delete this comment?">delete</a>
+    {% endif %}
+  </div>
+  <div class="comment-body" id="body-{{ node.comment.id }}" data-raw="{{ node.comment.body }}">{{ node.comment.body | render_mentions(mention_map.get(node.comment.id, {})) }}{% if node.comment.edited_at %} <span class="edited-marker" title="edited {{ node.comment.edited_at | timeago }}">(edited)</span>{% endif %}</div>
+  <div class="edit-form hidden" id="edit-{{ node.comment.id }}">
+    <form hx-patch="/comment/{{ node.comment.id }}"
+          hx-target="#body-{{ node.comment.id }}"
+          hx-swap="outerHTML"
+          hx-on::after-request="document.getElementById('edit-{{ node.comment.id }}').classList.add('hidden')">
+      <textarea name="body" class="edit-textarea" id="edit-textarea-{{ node.comment.id }}"></textarea>
+      <div class="edit-actions">
+        <button type="submit" class="reply-btn">save</button>
+        <button type="button" class="reply-btn cancel-btn"
+                onclick="document.getElementById('edit-{{ node.comment.id }}').classList.add('hidden')">cancel</button>
+      </div>
+    </form>
+  </div>
+  {% if not locked %}
+  <div class="reply-form hidden">
+    <form hx-post="/reply"
+          hx-target="#children-{{ node.comment.id }}"
+          hx-swap="beforeend"
+          hx-on::after-request="this.reset(); this.closest('.reply-form').classList.add('hidden')">
+      <input type="hidden" name="post_id" value="{{ node.comment.post_id }}">
+      <input type="hidden" name="parent_comment_id" value="{{ node.comment.id }}">
+      <textarea name="body" class="reply-textarea" placeholder="Reply…"></textarea>
+      <button type="submit" class="reply-btn">reply</button>
+    </form>
+  </div>
+  {% endif %}
+  {% if depth >= 3 and node.children %}
+  <details class="deep-replies">
+    <summary class="deep-replies-toggle">{{ node.children | length }} more repl{{ 'y' if node.children | length == 1 else 'ies' }}</summary>
+    <ul class="comment-children" id="children-{{ node.comment.id }}">
+      {% for child in node.children %}
+        {{ render_comment(child, depth + 1, locked=locked, mention_map=mention_map) }}
+      {% endfor %}
+    </ul>
+  </details>
+  {% else %}
+  <ul class="comment-children" id="children-{{ node.comment.id }}">
+    {% for child in node.children %}
+      {{ render_comment(child, depth + 1, locked=locked, mention_map=mention_map) }}
+    {% endfor %}
+  </ul>
+  {% endif %}
+</li>
+{% endmacro %}

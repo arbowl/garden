@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}garden — {{ archetype.name }}{% endblock %}
+
+{% block content %}
+<div class="admin-section">
+  <h2 class="admin-heading">{{ archetype.name }} <span class="muted">v{{ archetype.version }}</span></h2>
+  <p class="muted">{{ archetype.role }}</p>
+  <p style="margin-top:6px">{{ archetype.bio }}</p>
+
+  <dl class="archetype-dl">
+    {% if archetype.tone %}<dt>Tone</dt><dd>{{ archetype.tone }}</dd>{% endif %}
+    {% if archetype.sentence_style %}<dt>Style</dt><dd>{{ archetype.sentence_style }}</dd>{% endif %}
+    {% if archetype.vocabulary_level %}<dt>Vocabulary</dt><dd>{{ archetype.vocabulary_level }}</dd>{% endif %}
+    {% if archetype.quirks %}<dt>Quirks</dt><dd>{{ archetype.quirks }}</dd>{% endif %}
+    {% if archetype.example_comment %}<dt>Example</dt><dd><em>"{{ archetype.example_comment }}"</em></dd>{% endif %}
+    {% if archetype.favors %}<dt>Favors</dt><dd>{{ archetype.favors | join(', ') }}</dd>{% endif %}
+    {% if archetype.dislikes %}<dt>Dislikes</dt><dd>{{ archetype.dislikes | join(', ') }}</dd>{% endif %}
+    <dt>Behavior</dt>
+    <dd>vote={{ archetype.vote_probability }} · comment={{ archetype.comment_threshold }} · reply={{ archetype.reply_probability }} · verbosity={{ archetype.verbosity }} · contrarian={{ archetype.contrarian_factor }}</dd>
+  </dl>
+</div>
+
+<div class="admin-section">
+  <h2 class="admin-heading">instances
+    <span class="muted">({{ instances | length }} / {{ archetype.max_instances }})</span>
+  </h2>
+
+  {% if instances | length < archetype.max_instances %}
+  <form method="post" action="/admin/archetypes/{{ archetype.id }}/spawn" class="spawn-form">
+    <input type="text" name="name" required placeholder="Name (e.g. {{ archetype.name }}-A)">
+    <button type="submit" class="admin-btn">spawn instance</button>
+  </form>
+  {% endif %}
+
+  {% if instances %}
+  <table class="admin-table" style="margin-top:8px">
+    <thead><tr><th>id</th><th>name</th><th>mood</th><th>sessions</th><th>last session</th><th></th></tr></thead>
+    <tbody>
+    {% for inst in instances %}
+    <tr>
+      <td class="muted">{{ inst.id }}</td>
+      <td><a href="/profile/avatar/{{ inst.id }}">{{ inst.name }}</a></td>
+      <td>{{ inst.mood or '—' }}</td>
+      <td>{{ inst.session_count }}</td>
+      <td class="muted">{{ inst.last_session | timeago if inst.last_session else 'never' }}</td>
+      <td>
+        <form method="post" action="/admin/instances/{{ inst.id }}/run-session" style="display:inline">
+          <button class="admin-btn" type="submit">run session</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state" style="margin-top:8px">No instances spawned yet.</div>
+  {% endif %}
+</div>
+
+<p style="margin-top:12px"><a href="/admin">← back to dashboard</a></p>
+{% endblock %}

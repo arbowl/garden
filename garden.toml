@@ -1,0 +1,3 @@
+ollama_disciplined_model = "qwen3:8b"
+ollama_creative_model = "rocinante-x:12b"
+max_posts_per_source = 5

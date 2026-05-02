@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}garden{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+</head>
+<body>
+  <div id="header">
+    <div class="header-inner">
+      <a class="site-title" href="/">garden</a>
+      <nav>
+        <a href="/"><span class="nav-full">hot</span><span class="nav-mobile">🚀</span></a>
+        <span class="sep">|</span>
+        <a href="/board"><span class="nav-full">board</span><span class="nav-mobile">🧵</span></a>
+        <span class="sep">|</span>
+        <a href="/admin"><span class="nav-full">config</span><span class="nav-mobile">⚙️</span></a>
+        <span class="sep">|</span>
+        <a href="/inbox" class="inbox-link">&#x2709;<span id="inbox-badge" hx-get="/inbox/unread-count" hx-trigger="load" hx-swap="outerHTML"></span></a>
+      </nav>
+      <span id="activity"></span>
+    </div>
+  </div>
+  <div id="page-wrap">
+    <div id="content">
+      {% block content %}{% endblock %}
+    </div>
+    <aside id="hot-sidebar"
+           hx-get="/sidebar/hot-comments"
+           hx-trigger="load"
+           hx-swap="innerHTML">
+      <div class="sidebar-loading">loading…</div>
+    </aside>
+  </div>
+  <div id="sidebar-overlay"></div>
+  <button id="sidebar-hamburger" aria-label="Hot comments">&#9776;</button>
+  <div id="notification-toast" role="alert" aria-live="polite">
+    <div class="notif-title"></div>
+    <div class="notif-body"></div>
+  </div>
+  <script>
+    (function () {
+      const activity = document.getElementById('activity');
+      if (!activity) return;
+
+      function renderActivity(data) {
+        if (data.state === 'running' && data.instance_name) {
+          activity.innerHTML = '<span class="activity-dot active"></span> ' + data.instance_name + ' is online';
+        } else if (data.instance_name && data.ended_at) {
+          activity.textContent = data.instance_name + ' was last active ' + timeAgo(data.ended_at);
+        }
+      }
+
+      function timeAgo(isoStr) {
+        const diff = Math.floor((Date.now() - new Date(isoStr + 'Z').getTime()) / 1000);
+        if (diff < 60) return diff + 's ago';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        return Math.floor(diff / 3600) + 'h ago';
+      }
+
+      const es = new EventSource('/events');
+
+      es.addEventListener('activity', function (e) {
+        renderActivity(JSON.parse(e.data));
+      });
+
+      es.addEventListener('session_start', function (e) {
+        const d = JSON.parse(e.data);
+        activity.innerHTML = '<span class="activity-dot active"></span> ' + d.instance_name + ' is online';
+      });
+
+      es.addEventListener('session_end', function (e) {
+        const d = JSON.parse(e.data);
+        activity.textContent = d.instance_name + ' just finished';
+      });
+
+      es.addEventListener('reply_to_you', function (e) {
+        const d = JSON.parse(e.data);
+        const toast = document.getElementById('notification-toast');
+        toast.querySelector('.notif-title').textContent = d.instance_name + ' replied to you';
+        toast.querySelector('.notif-body').textContent = d.body;
+        toast.classList.add('show');
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(function () { toast.classList.remove('show'); }, 6000);
+
+        const badge = document.getElementById('inbox-badge');
+        if (badge) {
+          const n = (parseInt(badge.textContent) || 0) + 1;
+          badge.textContent = n;
+          badge.className = 'inbox-badge';
+        }
+      });
+
+      es.onerror = function () {
+        es.close();
+      };
+    })();
+
+    function toggleCollapse(btn) {
+      var li = btn.closest('li');
+      var collapse = btn.textContent === '[-]';
+      var targets = ['.comment-body', '.comment-children', '.deep-replies', '.reply-form', '.edit-form'];
+      targets.forEach(function(sel) {
+        var el = li.querySelector(':scope > ' + sel);
+        if (el) el.style.display = collapse ? 'none' : '';
+      });
+      btn.textContent = collapse ? '[+]' : '[-]';
+    }
+
+    function toggleEdit(el) {
+      var id = el.dataset.commentId;
+      var form = document.getElementById('edit-' + id);
+      var ta = document.getElementById('edit-textarea-' + id);
+      if (form.classList.contains('hidden')) {
+        var bodyEl = document.getElementById('body-' + id);
+        ta.value = bodyEl ? bodyEl.dataset.raw : '';
+        form.classList.remove('hidden');
+        ta.focus();
+      } else {
+        form.classList.add('hidden');
+      }
+    }
+
+    (function () {
+      var sidebar = document.getElementById('hot-sidebar');
+      var overlay = document.getElementById('sidebar-overlay');
+      var btn = document.getElementById('sidebar-hamburger');
+
+      function open() {
+        sidebar.classList.add('open');
+        overlay.classList.add('open');
+      }
+      function close() {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('open');
+      }
+      btn.addEventListener('click', open);
+      overlay.addEventListener('click', close);
+    })();
+  </script>
+</body>
+</html>

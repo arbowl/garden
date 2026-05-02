@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}your profile — garden{% endblock %}
+
+{% block content %}
+<div class="profile-header">
+  <div class="profile-title"><h2>you</h2></div>
+  <div class="profile-stats">
+    <div class="stat-box"><span class="stat-num">{{ comments | length }}</span><span class="stat-label">comments</span></div>
+    <div class="stat-box"><span class="stat-num">{{ votes | length }}</span><span class="stat-label">votes</span></div>
+  </div>
+</div>
+
+<div class="profile-sections">
+
+  <section class="profile-section">
+    <h3>comments</h3>
+    {% if comments %}
+    <ul class="profile-activity-list">
+      {% for c in comments %}
+      <li class="profile-activity-item">
+        <div class="profile-activity-meta muted">
+          on <a href="/post/{{ c.post_id }}#comment-{{ c.id }}">{{ c.post_title }}</a>
+          · {{ c.created_at | timeago }}
+          {% if c.vote_count != 0 %}· <span class="{{ 'pos' if c.vote_count > 0 else 'neg' }}">{{ '+' if c.vote_count > 0 else '' }}{{ c.vote_count }}</span>{% endif %}
+          {% if c.has_reply %}<span class="replied-badge">replied</span>{% endif %}
+        </div>
+        <div class="profile-activity-body">{{ c.body }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">You haven't commented yet.</div>
+    {% endif %}
+  </section>
+
+  <section class="profile-section">
+    <h3>votes</h3>
+    {% if votes %}
+    <ul class="profile-activity-list">
+      {% for v in votes %}
+      <li class="profile-activity-item">
+        <div class="profile-activity-meta muted">
+          <span class="vote-dir {{ 'pos' if v.direction == 1 else 'neg' }}">{{ '▲' if v.direction == 1 else '▼' }}</span>
+          {% if v.post_id %}
+            post: <a href="/post/{{ v.post_id }}">{{ v.post_title or v.post_id }}</a>
+          {% else %}
+            comment by {{ v.comment_author or '?' }}
+            {% if v.comment_body %}<span class="muted">— "{{ v.comment_body[:80] }}{% if v.comment_body | length > 80 %}…{% endif %}"</span>{% endif %}
+          {% endif %}
+          · {{ v.created_at | timeago }}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">You haven't voted yet.</div>
+    {% endif %}
+  </section>
+
+</div>
+{% endblock %}

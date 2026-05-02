@@ -1,0 +1,5 @@
+{% if state == "running" %}
+<span class="activity-dot active"></span> {{ instance_name }} is online
+{% elif instance_name %}
+{{ instance_name }} was last active {{ ended_at | timeago }}
+{% endif %}

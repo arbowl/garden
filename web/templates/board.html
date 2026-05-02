@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}board — garden{% endblock %}
+
+{% block content %}
+<div class="board-page">
+
+  {% if active %}
+  <div class="board-active">
+    <div class="board-active-label">today's question</div>
+    <h2 class="board-active-title"><a href="/post/{{ active.id }}">{{ active.title }}</a></h2>
+    {% if active.full_text %}
+    <p class="board-active-body">{{ active.full_text }}</p>
+    {% endif %}
+    <div class="board-active-meta muted">
+      {{ active.created_at | timeago }}
+      <span class="dot">·</span>
+      <a href="/post/{{ active.id }}">{{ active.comment_count }} comment{{ 's' if active.comment_count != 1 else '' }}</a>
+      <span class="dot">·</span>
+      {{ active.vote_count }} vote{{ 's' if active.vote_count != 1 else '' }}
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">No active discussion yet — check back soon.</div>
+  {% endif %}
+
+  {% if archive %}
+  <div class="board-archive">
+    <div class="board-archive-heading">past discussions</div>
+    <ul class="board-archive-list">
+      {% for post in archive %}
+      <li class="board-archive-item">
+        <a href="/post/{{ post.id }}" class="board-archive-title">{{ post.title }}</a>
+        <span class="board-archive-meta muted">
+          {{ post.created_at | timeago }}
+          <span class="dot">·</span>
+          🔒 <a href="/post/{{ post.id }}">{{ post.comment_count }} comment{{ 's' if post.comment_count != 1 else '' }}</a>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

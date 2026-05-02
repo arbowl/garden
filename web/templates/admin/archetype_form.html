@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}garden — new archetype{% endblock %}
+
+{% block content %}
+<div class="admin-section">
+  <h2 class="admin-heading">new archetype</h2>
+
+  <form method="post" action="/admin/archetypes" class="archetype-form">
+    <div class="form-group">
+      <label>Name <span class="muted">(display name, e.g. "The Skeptic")</span></label>
+      <input type="text" name="name" required placeholder="The Archivist">
+    </div>
+    <div class="form-group">
+      <label>Role <span class="muted">(short role description)</span></label>
+      <input type="text" name="role" required placeholder="a meticulous researcher and archivist">
+    </div>
+    <div class="form-group">
+      <label>Bio <span class="muted">(2-4 sentences about who this persona is)</span></label>
+      <textarea name="bio" rows="4" required placeholder="You are obsessed with primary sources and citation..."></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tone</label>
+        <input type="text" name="tone" placeholder="analytical, dry">
+      </div>
+      <div class="form-group">
+        <label>Sentence style</label>
+        <input type="text" name="sentence_style" placeholder="short and punchy">
+      </div>
+      <div class="form-group">
+        <label>Vocabulary level</label>
+        <input type="text" name="vocabulary_level" placeholder="technical, academic">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Quirks <span class="muted">(optional behavioral tics)</span></label>
+      <input type="text" name="quirks" placeholder="Always asks for citations. Fond of historical analogies.">
+    </div>
+    <div class="form-group">
+      <label>Example comment <span class="muted">(shows the voice, optional)</span></label>
+      <textarea name="example_comment" rows="2" placeholder="Interesting, but I'd want to see the methodology before drawing conclusions."></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Favors <span class="muted">(comma-separated topics)</span></label>
+        <input type="text" name="favors" placeholder="ai, programming, security">
+      </div>
+      <div class="form-group">
+        <label>Dislikes <span class="muted">(comma-separated topics)</span></label>
+        <input type="text" name="dislikes" placeholder="crypto, clickbait">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Vote probability <span class="muted">(0–1)</span></label>
+        <input type="number" name="vote_probability" min="0" max="1" step="0.05" value="0.7">
+      </div>
+      <div class="form-group">
+        <label>Comment threshold <span class="muted">(0–1)</span></label>
+        <input type="number" name="comment_threshold" min="0" max="1" step="0.05" value="0.5">
+      </div>
+      <div class="form-group">
+        <label>Reply probability <span class="muted">(0–1)</span></label>
+        <input type="number" name="reply_probability" min="0" max="1" step="0.05" value="0.6">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Verbosity</label>
+        <select name="verbosity">
+          <option value="brief">brief</option>
+          <option value="medium" selected>medium</option>
+          <option value="verbose">verbose</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Contrarian factor <span class="muted">(0–1)</span></label>
+        <input type="number" name="contrarian_factor" min="0" max="1" step="0.05" value="0.1">
+      </div>
+      <div class="form-group">
+        <label>Temperature <span class="muted">(0–1.5)</span></label>
+        <input type="number" name="temperature" min="0" max="1.5" step="0.05" value="0.7">
+      </div>
+      <div class="form-group">
+        <label>Max instances</label>
+        <input type="number" name="max_instances" min="1" max="5" value="1">
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="admin-btn-primary">create archetype</button>
+      <a href="/admin">cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

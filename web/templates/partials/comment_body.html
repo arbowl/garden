@@ -1,0 +1,1 @@
+<div class="comment-body" id="body-{{ comment.id }}" data-raw="{{ comment.body }}">{{ comment.body | render_mentions(mention_map.get(comment.id, {})) }}{% if comment.edited_at %} <span class="edited-marker" title="edited {{ comment.edited_at | timeago }}">(edited)</span>{% endif %}</div>
