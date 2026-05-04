@@ -1477,12 +1477,23 @@ details[open] .deep-replies-toggle::before { content: "▼ "; }
 
 /* ── Profile relationships ── */
 .profile-relationships {
-  display: flex;
-  gap: 14px;
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 12px;
 }
-.rel-item { display: flex; align-items: center; gap: 4px; }
-.rel-pos { color: #b05d5d; }
-.rel-neg { color: #666; }
-.rel-pos a, .rel-neg a { font-weight: bold; }
+.rel-heading {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.rel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+.rel-role { width: 40px; font-size: 11px; }
+.rel-name { font-weight: bold; }
+.rel-score { font-variant-numeric: tabular-nums; }
+.rel-pos { color: #5d8a5d; }
+.rel-neg { color: #888; }

@@ -3,7 +3,7 @@ posts.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import aiosqlite
 
@@ -112,7 +112,7 @@ async def write_editorial_for_instance(
     hours: int = 24,
 ) -> int | None:
     """Generate and store a daily editorial for one instance. Returns editorial id or None."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     if await has_editorial_for_date(db, instance_id, today):
         return None
 
@@ -128,7 +128,7 @@ async def write_editorial_for_instance(
     system_prompt = build_system_prompt(archetype, drift, memory)
 
     sessions = await get_sessions_for_editorial(db, instance_id, hours=hours)
-    date_str = datetime.now(timezone.utc).strftime("%A, %B %-d")
+    date_str = datetime.now(UTC).strftime("%A, %B %-d")
     system, user = build_editorial_prompt(system_prompt, sessions, instance.name, date_str)
 
     try:
@@ -161,7 +161,7 @@ async def synthesize_board_post(db: aiosqlite.Connection, client: OllamaClient) 
         logger.error("synthesis response parse failed")
         return None
     post_id = await insert_board_post(db, result.title, result.body)
-    logger.info("board post created: %d — %s", post_id, result.title[:80])
+    logger.info("board post created: %d; %s", post_id, result.title[:80])
     return post_id
 
 

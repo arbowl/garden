@@ -34,7 +34,7 @@ async def event_stream(request: Request):
                 try:
                     event = await asyncio.wait_for(q.get(), timeout=25)
                     yield {"event": event["type"], "data": json.dumps(event)}
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     yield {"event": "ping", "data": "{}"}
         finally:
             broadcaster.unsubscribe(q)

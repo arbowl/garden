@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}garden — sources{% endblock %}
+{% block title %}garden; sources{% endblock %}
 
 {% block content %}
 <div class="admin-section">
@@ -10,7 +10,7 @@
   {% if request.query_params.get('fetched') %}
   <div class="fetch-result">
     fetched <strong>{{ request.query_params.get('fetched') }}</strong>
-    — {{ request.query_params.get('new', 0) }} new post{{ 's' if request.query_params.get('new') != '1' else '' }}
+   ; {{ request.query_params.get('new', 0) }} new post{{ 's' if request.query_params.get('new') != '1' else '' }}
   </div>
   {% endif %}
 

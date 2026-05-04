@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ instance.name }} — garden{% endblock %}
+{% block title %}{{ instance.name }}; garden{% endblock %}
 
 {% macro paginate(page, pages, param, other_params) %}
 {% if pages > 1 %}
@@ -33,15 +33,20 @@
   </div>
   {% if relationships.best or relationships.worst %}
   <div class="profile-relationships">
+    <div class="rel-heading muted">relationships</div>
     {% if relationships.best %}
-    <span class="rel-item rel-pos">
-      💛 <a href="{% if relationships.best.instance_id %}/profile/avatar/{{ relationships.best.instance_id }}{% else %}/profile/you{% endif %}">{{ relationships.best.object_name }}</a>
-    </span>
+    <div class="rel-row">
+      <span class="rel-role muted">friend</span>
+      <a class="rel-name" href="{% if relationships.best.instance_id %}/profile/avatar/{{ relationships.best.instance_id }}{% else %}/profile/you{% endif %}">{{ relationships.best.object_name }}</a>
+      <span class="rel-score rel-pos">+{{ relationships.best.score | round(1) }}</span>
+    </div>
     {% endif %}
     {% if relationships.worst %}
-    <span class="rel-item rel-neg">
-      ⚔️ <a href="{% if relationships.worst.instance_id %}/profile/avatar/{{ relationships.worst.instance_id }}{% else %}/profile/you{% endif %}">{{ relationships.worst.object_name }}</a>
-    </span>
+    <div class="rel-row">
+      <span class="rel-role muted">enemy</span>
+      <a class="rel-name" href="{% if relationships.worst.instance_id %}/profile/avatar/{{ relationships.worst.instance_id }}{% else %}/profile/you{% endif %}">{{ relationships.worst.object_name }}</a>
+      <span class="rel-score rel-neg">{{ relationships.worst.score | round(1) }}</span>
+    </div>
     {% endif %}
   </div>
   {% endif %}

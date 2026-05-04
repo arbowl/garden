@@ -113,7 +113,7 @@ class Memory:
 
 
 _VERBOSITY_HINTS = {
-    "brief": "Keep your comments short — 1 to 3 sentences max.",
+    "brief": "Keep your comments short; 1 to 3 sentences max.",
     "verbose": "You tend to write detailed, thorough responses. Don't hold back.",
     "medium": "Write moderate-length comments, around 2 to 5 sentences.",
 }
@@ -158,7 +158,7 @@ def build_system_prompt(
     if archetype.vocabulary_level:
         voice_parts.append(f"vocabulary is {archetype.vocabulary_level}")
     if voice_parts:
-        lines.append("Your voice — " + "; ".join(voice_parts) + ".")
+        lines.append("Your voice; " + "; ".join(voice_parts) + ".")
     if archetype.quirks:
         lines.append(f"Quirks: {archetype.quirks}")
     if archetype.example_comment:
@@ -188,9 +188,11 @@ def build_system_prompt(
             score = float(rel["score"])
             label = _rel_prompt_label(score)
             if score > 0:
-                rel_lines.append(f"You feel warmly toward {name} — you consider them {label}.")
+                rel_lines.append(f"You feel warmly toward {name}; you consider them {label}.")
             else:
-                rel_lines.append(f"You have a negative feeling toward {name} — you consider them {label}.")
+                rel_lines.append(
+                    f"You have a negative feeling toward {name}; you consider them {label}."
+                )
         if rel_lines:
             lines.append("Your feelings about other users:")
             lines.extend(rel_lines)

@@ -1,12 +1,12 @@
-""""Functions for fetching and processing news posts from RSS feeds, including error handling and
+""" "Functions for fetching and processing news posts from RSS feeds, including error handling and
 logging."""
 
 import logging
 from dataclasses import dataclass
 
-import feedparser
-import httpx
 import aiosqlite
+import feedparser  # type: ignore
+import httpx
 
 from db.queries import insert_raw_post
 from ingest.sources import Source
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 class FetchResult:
     """Represents the result of fetching a source, including the number of entries fetched, how many
     were new, and how many errors occurred."""
+
     source_name: str
     fetched: int
     new: int
@@ -31,8 +32,8 @@ async def _fetch_feed(client: httpx.AsyncClient, source: Source) -> list[dict]:
         feed = feedparser.parse(response.text)
         entries = []
         for entry in feed.entries:
-            url = entry.get("link", "").strip()
-            title = entry.get("title", "").strip()
+            url = str(entry.get("link", "")).strip()
+            title = str(entry.get("title", "")).strip()
             if not url or not title:
                 continue
             raw_content = entry.get("summary") or entry.get("description") or None

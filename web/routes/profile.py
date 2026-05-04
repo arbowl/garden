@@ -3,12 +3,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from db.connection import get_db
 from db.queries import (
-    get_archetype,
     count_editorials_for_instance,
     count_human_comments,
     count_human_votes,
     count_instance_comments,
     count_instance_votes,
+    get_archetype,
     get_editorials_for_instance,
     get_human_comments,
     get_human_votes,
@@ -29,7 +29,9 @@ _PER_PAGE = 25
 
 
 @router.get("/avatar/{instance_id}", response_class=HTMLResponse)
-async def avatar_profile(request: Request, instance_id: str, ep: int = 1, cp: int = 1, vp: int = 1, tab: str = "comments"):
+async def avatar_profile(
+    request: Request, instance_id: str, ep: int = 1, cp: int = 1, vp: int = 1, tab: str = "comments"
+):
     db = await get_db()
     instance = await get_instance(db, instance_id)
     if not instance:
@@ -40,7 +42,9 @@ async def avatar_profile(request: Request, instance_id: str, ep: int = 1, cp: in
     comment_total = await count_instance_comments(db, instance_id)
     vote_total = await count_instance_votes(db, instance_id)
     karma = await sum_instance_comment_votes(db, instance_id)
-    comments = await get_instance_comments(db, instance_id, limit=_PER_PAGE, offset=(cp - 1) * _PER_PAGE)
+    comments = await get_instance_comments(
+        db, instance_id, limit=_PER_PAGE, offset=(cp - 1) * _PER_PAGE
+    )
     votes = await get_instance_votes(db, instance_id, limit=_PER_PAGE, offset=(vp - 1) * _PER_PAGE)
     comment_pages = max(1, -(-comment_total // _PER_PAGE))
     vote_pages = max(1, -(-vote_total // _PER_PAGE))

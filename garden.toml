@@ -1,3 +1,6 @@
 ollama_disciplined_model = "qwen3:8b"
 ollama_creative_model = "rocinante-x:12b"
 max_posts_per_source = 5
+hot_rank_gravity = 3.6
+avatar_session_interval_minutes = 5
+max_post_comments = 27

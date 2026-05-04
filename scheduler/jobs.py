@@ -2,13 +2,12 @@ import asyncio
 import logging
 import random
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore
 
 from avatars.session import AvatarSession
 from config import settings
-from curator.curator import curate_all
+from curator.curator import curate_all, synthesize_board_post, write_editorial_for_instance
 from db.connection import get_db
-from curator.curator import synthesize_board_post, write_editorial_for_instance
 from db.queries import (
     archive_board_post,
     archive_old_posts,
@@ -90,7 +89,8 @@ async def expire_job() -> None:
     if count:
         logger.info("[scheduler] expire_job archived %d old post(s)", count)
     async with db.execute(
-        "UPDATE mentions SET resolved = 1 WHERE resolved = 0 AND created_at < datetime('now', '-1 day')"
+        "UPDATE mentions SET resolved = 1 WHERE resolved = 0 AND created_at < "
+        "datetime('now', '-1 day')"
     ) as cur:
         expired = cur.rowcount
     await db.commit()
@@ -108,7 +108,7 @@ async def editorial_job() -> None:
     await asyncio.gather(
         *[write_editorial_for_instance(db, creative, instance.id) for instance in instances]
     )
-    logger.info("[scheduler] editorial_job done — %d instance(s) processed", len(instances))
+    logger.info("[scheduler] editorial_job done; %d instance(s) processed", len(instances))
 
 
 async def board_synthesis_job() -> None:
@@ -180,7 +180,7 @@ def start_scheduler() -> None:
     )
     _scheduler.start()
     logger.info(
-        "[scheduler] started — fetch every %dm, avatar every %dm",
+        "[scheduler] started; fetch every %dm, avatar every %dm",
         settings.fetch_interval_minutes,
         settings.avatar_session_interval_minutes,
     )

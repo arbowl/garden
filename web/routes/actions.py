@@ -2,6 +2,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 
+import aiosqlite
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
@@ -17,17 +18,20 @@ from db.queries import (
     insert_vote,
     update_comment_body,
 )
+from web.templating import templates
 
 _MENTION_RE = re.compile(r"@(\w+)")
-from web.templating import templates
+
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-async def _handle_mentions(db, body: str, comment_id: int, post_id: int) -> None:
-    names = {m.lower() for m in _MENTION_RE.findall(body)}
+async def _handle_mentions(
+    db: aiosqlite.Connection, body: str, comment_id: int, post_id: int
+) -> None:
+    names = {str(m).lower() for m in _MENTION_RE.findall(body)}
     if not names:
         return
     for name in names:

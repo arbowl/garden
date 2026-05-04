@@ -4,14 +4,14 @@ with archetypes, instances, sessions, posts, comments, votes, and notifications.
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import aiosqlite
 
 from .models import (
     Archetype,
-    Comment,
     AuthorType,
+    Comment,
     ContentType,
     Instance,
     Post,
@@ -170,7 +170,8 @@ async def get_active_instances(db: aiosqlite.Connection) -> list[Instance]:
 
 async def get_curated_posts_for_recalc(db: aiosqlite.Connection) -> list[dict]:
     async with db.execute(
-        "SELECT id, default_score, vote_count, engagement_score, last_activity FROM posts WHERE status = 'curated'"
+        "SELECT id, default_score, vote_count, engagement_score, last_activity FROM posts WHERE "
+        "status = 'curated'"
     ) as cur:
         rows = await cur.fetchall()
     return [
@@ -211,7 +212,8 @@ async def update_engagement_scores(db: aiosqlite.Connection) -> None:
 
 async def close_stale_sessions(db: aiosqlite.Connection) -> int:
     async with db.execute(
-        "UPDATE sessions SET ended_at = datetime('now'), error = 'interrupted' WHERE ended_at IS NULL"
+        "UPDATE sessions SET ended_at = datetime('now'), error = 'interrupted' WHERE ended_at IS "
+        "NULL"
     ) as cur:
         count = cur.rowcount
     await db.commit()
@@ -326,7 +328,8 @@ async def delete_instance(db: aiosqlite.Connection, instance_id: str) -> None:
         affected_posts = {r["post_id"] for r in rows}
         for post_id in affected_posts:
             await db.execute(
-                "UPDATE posts SET comment_count = (SELECT COUNT(*) FROM comments WHERE post_id = ?) WHERE id = ?",
+                "UPDATE posts SET comment_count = (SELECT COUNT(*) FROM comments WHERE post_id = ?)"
+                 " WHERE id = ?",
                 (post_id, post_id),
             )
 
@@ -375,11 +378,26 @@ async def update_archetype(
                version = version + 1
            WHERE id = ?""",
         (
-            name, bio, role, tone, sentence_style, vocabulary_level, quirks, example_comment,
-            json.dumps(favors), json.dumps(dislikes), json.dumps(indifferent),
-            vote_probability, comment_threshold, reply_probability,
-            verbosity, contrarian_factor, temperature,
-            max_instances, int(is_active), new_post_bias,
+            name,
+            bio,
+            role,
+            tone,
+            sentence_style,
+            vocabulary_level,
+            quirks,
+            example_comment,
+            json.dumps(favors),
+            json.dumps(dislikes),
+            json.dumps(indifferent),
+            vote_probability,
+            comment_threshold,
+            reply_probability,
+            verbosity,
+            contrarian_factor,
+            temperature,
+            max_instances,
+            int(is_active),
+            new_post_bias,
             archetype_id,
         ),
     )
@@ -522,7 +540,8 @@ async def count_instance_comments_on_post(
     post_id: int,
 ) -> int:
     async with db.execute(
-        "SELECT COUNT(*) FROM comments WHERE author_id = ? AND author_type = 'avatar' AND post_id = ?",
+        "SELECT COUNT(*) FROM comments WHERE author_id = ? AND author_type = 'avatar' "
+        "AND post_id = ?",
         (instance_id, post_id),
     ) as cur:
         row = await cur.fetchone()
@@ -605,7 +624,8 @@ async def get_posts_by_status(
 
 async def get_new_posts(db: aiosqlite.Connection, limit: int = 50, offset: int = 0) -> list[Post]:
     async with db.execute(
-        "SELECT * FROM posts WHERE status NOT IN ('rejected', 'archived') ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        "SELECT * FROM posts WHERE status NOT IN ('rejected', 'archived') ORDER BY created_at DESC "
+        "LIMIT ? OFFSET ?",
         (limit, offset),
     ) as cursor:
         rows = await cursor.fetchall()
@@ -626,9 +646,21 @@ async def archive_old_posts(db: aiosqlite.Connection, days: int = 1) -> int:
     return count
 
 
-async def get_avatar_commented_post_ids(db: aiosqlite.Connection, avatar_id: int) -> set[int]:
+async def get_avatar_commented_post_ids(db: aiosqlite.Connection, avatar_id: int | str) -> set[int]:
     async with db.execute(
         "SELECT DISTINCT post_id FROM comments WHERE author_id = ? AND author_type = ?",
+        (avatar_id, AuthorType.AVATAR.value),
+    ) as cursor:
+        rows = await cursor.fetchall()
+    return {row[0] for row in rows}
+
+
+async def get_avatar_top_level_commented_post_ids(
+    db: aiosqlite.Connection, avatar_id: int | str
+) -> set[int]:
+    async with db.execute(
+        "SELECT DISTINCT post_id FROM comments WHERE author_id = ? AND author_type = ? "
+        "AND parent_comment_id IS NULL",
         (avatar_id, AuthorType.AVATAR.value),
     ) as cursor:
         rows = await cursor.fetchall()
@@ -794,7 +826,8 @@ async def insert_comment(
 
     async with db.execute(
         """
-        INSERT INTO comments (post_id, parent_comment_id, author_type, author_id, author_name, body, depth)
+        INSERT INTO comments (post_id, parent_comment_id, author_type, author_id, author_name, "
+        "body, depth)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (post_id, parent_comment_id, author_type.value, author_id, author_name, body, depth),
@@ -802,7 +835,8 @@ async def insert_comment(
         comment_id = cursor.lastrowid
 
     await db.execute(
-        "UPDATE posts SET comment_count = comment_count + 1, last_activity = datetime('now') WHERE id = ?",
+        "UPDATE posts SET comment_count = comment_count + 1, last_activity = datetime('now') WHERE "
+        "id = ?",
         (post_id,),
     )
     await db.commit()
@@ -872,17 +906,21 @@ async def insert_vote(
     voter_id: str | None = None,
     reason: str | None = None,
 ) -> bool:
-    """Insert or update a vote. Returns False if the vote was a no-op (same direction already cast)."""
+    """Insert or update a vote. Returns False if the vote was a no-op (same direction already
+    cast).
+    """
     if voter_id is not None:
         if post_id is not None:
             async with db.execute(
-                "SELECT id, direction FROM votes WHERE post_id = ? AND voter_type = ? AND voter_id = ?",
+                "SELECT id, direction FROM votes WHERE post_id = ? AND voter_type = ? AND "
+                "voter_id = ?",
                 (post_id, voter_type.value, voter_id),
             ) as cur:
                 existing = await cur.fetchone()
         else:
             async with db.execute(
-                "SELECT id, direction FROM votes WHERE comment_id = ? AND voter_type = ? AND voter_id = ?",
+                "SELECT id, direction FROM votes WHERE comment_id = ? AND voter_type = ? AND "
+                "voter_id = ?",
                 (comment_id, voter_type.value, voter_id),
             ) as cur:
                 existing = await cur.fetchone()
@@ -897,7 +935,8 @@ async def insert_vote(
             )
             if post_id is not None:
                 await db.execute(
-                    "UPDATE posts SET vote_count = vote_count + ?, last_activity = datetime('now') WHERE id = ?",
+                    "UPDATE posts SET vote_count = vote_count + ?, last_activity = datetime('now') "
+                    "WHERE id = ?",
                     (delta, post_id),
                 )
             if comment_id is not None:
@@ -919,7 +958,8 @@ async def insert_vote(
     )
     if post_id is not None:
         await db.execute(
-            "UPDATE posts SET vote_count = vote_count + ?, last_activity = datetime('now') WHERE id = ?",
+            "UPDATE posts SET vote_count = vote_count + ?, last_activity = datetime('now') "
+            "WHERE id = ?",
             (direction, post_id),
         )
     if comment_id is not None:
@@ -1024,7 +1064,8 @@ async def count_instance_comments(db: aiosqlite.Connection, instance_id: str) ->
 
 async def sum_instance_comment_votes(db: aiosqlite.Connection, instance_id: str) -> int:
     async with db.execute(
-        "SELECT COALESCE(SUM(vote_count), 0) FROM comments WHERE author_id = ? AND author_type = 'avatar'",
+        "SELECT COALESCE(SUM(vote_count), 0) FROM comments WHERE author_id = ? AND "
+        "author_type = 'avatar'",
         (instance_id,),
     ) as cur:
         row = await cur.fetchone()
@@ -1066,7 +1107,9 @@ async def count_instance_votes(db: aiosqlite.Connection, instance_id: str) -> in
     return row[0] if row else 0
 
 
-async def get_human_comments(db: aiosqlite.Connection, limit: int = 25, offset: int = 0) -> list[dict]:
+async def get_human_comments(
+    db: aiosqlite.Connection, limit: int = 25, offset: int = 0
+) -> list[dict]:
     async with db.execute(
         """
         SELECT c.id, c.post_id, c.body, c.vote_count, c.created_at,
@@ -1106,7 +1149,8 @@ async def sum_human_comment_votes(db: aiosqlite.Connection) -> int:
 async def get_new_comments(db: aiosqlite.Connection, limit: int = 10) -> list[dict]:
     async with db.execute(
         """
-        SELECT c.id, c.post_id, c.author_name, c.author_type, c.author_id, c.body, c.vote_count, c.created_at,
+        SELECT c.id, c.post_id, c.author_name, c.author_type, c.author_id, c.body, c.vote_count, 
+        c.created_at,
                p.title as post_title
         FROM comments c
         JOIN posts p ON p.id = c.post_id
@@ -1123,7 +1167,8 @@ async def get_new_comments(db: aiosqlite.Connection, limit: int = 10) -> list[di
 async def get_hot_comments(db: aiosqlite.Connection, pool_size: int = 100) -> list[dict]:
     async with db.execute(
         """
-        SELECT c.id, c.post_id, c.author_name, c.author_type, c.author_id, c.body, c.vote_count, c.created_at,
+        SELECT c.id, c.post_id, c.author_name, c.author_type, c.author_id, c.body, c.vote_count,
+        c.created_at,
                p.title as post_title
         FROM comments c
         JOIN posts p ON p.id = c.post_id
@@ -1165,9 +1210,6 @@ async def count_human_votes(db: aiosqlite.Connection) -> int:
     ) as cur:
         row = await cur.fetchone()
     return row[0] if row else 0
-
-
-# ── Mention queries ──────────────────────────────────────────────────────────
 
 
 async def insert_mention(
@@ -1234,9 +1276,6 @@ async def resolve_mentions_for_instance(
         (instance_id, *post_ids),
     )
     await db.commit()
-
-
-# ── Editorial queries ────────────────────────────────────────────────────────
 
 
 async def insert_editorial(
@@ -1318,12 +1357,10 @@ async def get_sessions_for_editorial(
     return [dict(r) for r in rows]
 
 
-# ── Board queries ─────────────────────────────────────────────────────────────
-
-
 async def get_active_board_post(db: aiosqlite.Connection) -> "Post | None":
     async with db.execute(
-        "SELECT * FROM posts WHERE source_name = 'board' AND status = 'curated' ORDER BY created_at DESC LIMIT 1"
+        "SELECT * FROM posts WHERE source_name = 'board' AND status = 'curated' ORDER BY "
+        "created_at DESC LIMIT 1"
     ) as cur:
         row = await cur.fetchone()
     return _row_to_post(row) if row else None
@@ -1347,7 +1384,7 @@ async def archive_board_post(db: aiosqlite.Connection, post_id: int) -> None:
 
 
 async def insert_board_post(db: aiosqlite.Connection, title: str, body: str) -> int:
-    url = f"garden://board/{datetime.now(timezone.utc).isoformat()}"
+    url = f"garden://board/{datetime.now(UTC).isoformat()}"
     async with db.execute(
         """
         INSERT INTO posts
@@ -1405,16 +1442,14 @@ async def get_synthesis_context(db: aiosqlite.Connection, hours: int = 24) -> di
     return {"sessions": sessions, "posts": posts, "hot_comments": hot_comments}
 
 
-# ── Comment edit/delete ───────────────────────────────────────────────────────
-
-
 async def update_comment_body(
     db: aiosqlite.Connection,
     comment_id: int,
     body: str,
 ) -> bool:
     async with db.execute(
-        "UPDATE comments SET body = ?, edited_at = datetime('now') WHERE id = ? AND author_type = 'human'",
+        "UPDATE comments SET body = ?, edited_at = datetime('now') WHERE id = ? AND author_type "
+        "= 'human'",
         (body, comment_id),
     ) as cur:
         updated = cur.rowcount > 0
@@ -1511,7 +1546,7 @@ async def get_profile_relationships(
     async with db.execute(
         """
         SELECT r.object_id, r.score,
-               COALESCE(i.name, 'human') as object_name,
+               COALESCE(i.name, 'you') as object_name,
                i.id as instance_id
         FROM relationships r
         LEFT JOIN instances i ON i.id = r.object_id

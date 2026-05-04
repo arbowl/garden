@@ -10,11 +10,10 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 
 from config import settings
-from db.connection import get_db
+from curator.curator import curate_all
 from ingest.fetcher import fetch_all
 from ingest.sources import load_sources
 from llm.client import OllamaClient
-from curator.curator import curate_all
 
 
 async def run_pipeline() -> None:
@@ -33,7 +32,7 @@ async def run_pipeline() -> None:
         db, client, sources, threshold=settings.curator_threshold
     )
     logging.getLogger(__name__).info(
-        "Pipeline done — curated=%d rejected=%d failed=%d", curated, rejected, failed
+        "Pipeline done; curated=%d rejected=%d failed=%d", curated, rejected, failed
     )
 
 

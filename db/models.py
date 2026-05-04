@@ -6,6 +6,7 @@ from enum import StrEnum
 
 class PostStatus(StrEnum):
     """The lifecycle status of a post, which can guide how avatars interact with it."""
+
     RAW = "raw"
     CURATED = "curated"
     REJECTED = "rejected"
@@ -14,6 +15,7 @@ class PostStatus(StrEnum):
 
 class ContentType(StrEnum):
     """The type of content in a post, which can guide how avatars engage with it."""
+
     FETCHED = "fetched"
     EDITORIAL = "editorial"
     BOARD = "board"
@@ -23,6 +25,7 @@ class Urgency(StrEnum):
     """The level of time-sensitivity for engaging with the content, which can guide avatar
     behavior.
     """
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -30,6 +33,7 @@ class Urgency(StrEnum):
 
 class Richness(StrEnum):
     """The level of depth and detail in the content, which can guide how avatars engage with it."""
+
     HEADLINE_ONLY = "headline_only"
     SUMMARY = "summary"
     FULL_TEXT = "full_text"
@@ -37,6 +41,7 @@ class Richness(StrEnum):
 
 class AuthorType(StrEnum):
     """Distinguishes between human users and avatar instances as authors of comments and votes."""
+
     HUMAN = "human"
     AVATAR = "avatar"
 
@@ -44,6 +49,7 @@ class AuthorType(StrEnum):
 @dataclass
 class Post:
     """Represents a news post or article that avatars can interact with."""
+
     id: int
     url: str
     title: str
@@ -71,6 +77,7 @@ class Post:
 @dataclass
 class Comment:
     """A comment made by an avatar or human on a post, with potential nesting for threads."""
+
     id: int
     post_id: int
     author_type: AuthorType
@@ -87,6 +94,7 @@ class Comment:
 @dataclass
 class Vote:
     """A record of a vote cast by an avatar or human on a post or comment."""
+
     id: int
     voter_type: AuthorType
     direction: int
@@ -100,6 +108,7 @@ class Vote:
 @dataclass
 class Archetype:
     """A blueprint for an avatar, defining its general personality and behavior patterns."""
+
     id: int
     name: str
     version: int
@@ -130,6 +139,7 @@ class Instance:
     """A specific avatar in action, with its own drift vector and memory based on its unique
     experiences.
     """
+
     id: str
     archetype_id: int
     archetype_version: int
@@ -148,6 +158,7 @@ class Instance:
 class Session:
     """A single session of avatar activity, capturing its engagements and interactions during that
     session."""
+
     id: int
     instance_id: str
     started_at: str

@@ -1,4 +1,9 @@
-import asyncio
+"""Defines the AvatarSession class, which manages the lifecycle of an avatar's interaction with
+posts and comments. This includes triaging posts, engaging with them through comments and votes,
+reacting to replies, and winding down with reflections. The session maintains state such as memory
+and drift, and updates the database with the avatar's actions and reflections.
+"""
+
 import logging
 import random
 import re
@@ -8,15 +13,15 @@ from dataclasses import dataclass, field
 import aiosqlite
 
 from avatars.schema import DriftVector, Memory, build_system_prompt, post_affinity_score
-from config import settings
-from web.broadcaster import broadcaster
 from avatars.threading import flatten_thread
-from db.models import Archetype, Instance, Post
+from config import settings
+from db.models import Archetype, AuthorType, Instance, Post
 from db.queries import (
     count_instance_comments_on_post,
     get_active_board_post,
     get_archetype,
     get_avatar_commented_post_ids,
+    get_avatar_top_level_commented_post_ids,
     get_comments_for_post,
     get_hot_posts,
     get_instance,
@@ -46,15 +51,17 @@ from llm.prompts import (
     build_triage_prompt,
     build_wind_down_prompt,
 )
-from db.models import AuthorType
+from web.broadcaster import broadcaster
 
 logger = logging.getLogger(__name__)
 
 _MENTION_RE = re.compile(r"@(\w+)")
 
 
-async def _handle_mentions(db, body: str, comment_id: int, post_id: int) -> None:
-    names = {m.lower() for m in _MENTION_RE.findall(body)}
+async def _handle_mentions(
+    db: aiosqlite.Connection, body: str, comment_id: int, post_id: int
+) -> None:
+    names = {str(m).lower() for m in _MENTION_RE.findall(body)}
     if not names:
         return
     for name in names:
@@ -193,7 +200,7 @@ class AvatarSession:
             ended=True,
         )
         logger.info(
-            "[%s] session %d done — triaged=%d engaged=%d comments=%d votes=%d mood=%s",
+            "[%s] session %d done; triaged=%d engaged=%d comments=%d votes=%d mood=%s",
             instance.name,
             session_id,
             stats.posts_triaged,
@@ -246,6 +253,9 @@ class AvatarSession:
                 existing_ids.add(mp.id)
 
         commented_ids = await get_avatar_commented_post_ids(self.db, self.instance_id)
+        top_level_commented_ids = await get_avatar_top_level_commented_post_ids(
+            self.db, self.instance_id
+        )
 
         # Calibrate the recency bonus against the median hot score so new posts
         # compete meaningfully regardless of the absolute hot_score scale.
@@ -316,8 +326,33 @@ class AvatarSession:
                     break
                 engage_set.add(ctx.post.id)
             logger.debug(
-                "[%s] engagement floor applied — %d posts forced", instance.name, len(engage_set)
+                "[%s] engagement floor applied; %d posts forced", instance.name, len(engage_set)
             )
+
+        stale = {
+            ctx.post.id
+            for ctx in post_contexts
+            if ctx.post.id in top_level_commented_ids and not ctx.must_comment
+        }
+        if stale:
+            engage_set -= stale
+            logger.debug(
+                "[%s] filtered %d stale top-level posts from engage set", instance.name, len(stale)
+            )
+            if len(engage_set) < _MIN_ENGAGE:
+                by_affinity = sorted(
+                    [
+                        ctx
+                        for ctx in post_contexts
+                        if ctx.post.id not in engage_set and ctx.post.id not in stale
+                    ],
+                    key=lambda ctx: post_affinity_score(ctx.post.tags, archetype, drift),
+                    reverse=True,
+                )
+                for ctx in by_affinity:
+                    if len(engage_set) >= _MIN_ENGAGE:
+                        break
+                    engage_set.add(ctx.post.id)
 
         for ctx in post_contexts:
             if ctx.post.id in downvote_set and random.random() < archetype.vote_probability:
@@ -457,7 +492,7 @@ class AvatarSession:
             )
         ):
             logger.debug(
-                "[%s] skipping top-level on post %d — already has one", instance.name, post.id
+                "[%s] skipping top-level on post %d; already has one", instance.name, post.id
             )
             return
 
@@ -531,7 +566,7 @@ class AvatarSession:
             )
             if existing >= settings.max_replies_per_post:
                 logger.debug(
-                    "[%s] skipping reply on post %d — at reply cap (%d)",
+                    "[%s] skipping reply on post %d; at reply cap (%d)",
                     instance.name,
                     reply.post_id,
                     existing,

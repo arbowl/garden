@@ -1,11 +1,11 @@
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlparse
 
-from markupsafe import Markup, escape
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup, escape
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
@@ -21,8 +21,8 @@ def _timeago(dt_str: str) -> str:
     try:
         dt = datetime.fromisoformat(dt_str)
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        s = int((datetime.now(timezone.utc) - dt).total_seconds())
+            dt = dt.replace(tzinfo=UTC)
+        s = int((datetime.now(UTC) - dt).total_seconds())
         if s < 60:
             return "just now"
         if s < 3600:
@@ -41,8 +41,8 @@ def _timeshort(dt_str: str) -> str:
     try:
         dt = datetime.fromisoformat(dt_str)
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        s = int((datetime.now(timezone.utc) - dt).total_seconds())
+            dt = dt.replace(tzinfo=UTC)
+        s = int((datetime.now(UTC) - dt).total_seconds())
         if s < 60:
             return "now"
         if s < 3600:
@@ -110,6 +110,8 @@ def _render_mentions(body: str, mentions: dict) -> Markup:
 
     def _replace(m: re.Match) -> str:
         name = m.group(1)
+        if name.lower() == "you":
+            return f'<a href="/profile/you" class="mention">@{name}</a>'
         iid = mentions.get(name.lower())
         if iid:
             return f'<a href="/profile/avatar/{iid}" class="mention">@{name}</a>'

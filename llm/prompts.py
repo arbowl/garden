@@ -17,7 +17,8 @@ and return a JSON object with exactly these fields:
 {_CURATOR_SCHEMA}
 
 Field meanings:
-- relevance_score: how relevant and interesting this article is (0=spam/irrelevant, 1=essential reading)
+- relevance_score: how relevant and interesting this article is (0=spam/irrelevant, 1=essential
+reading)
 - urgency: how time-sensitive the content is
 - richness: how much quality content is available (headline_only=just a title, \
 summary=short description, full_text=full article available)
@@ -78,7 +79,8 @@ def build_triage_prompt(system_prompt: str, posts: list[Post]) -> tuple[str, str
         tags = ", ".join(p.tags[:3]) if p.tags else "general"
         lines.append(
             f'[id={p.id}] "{p.title}" ({p.source_name}) '
-            f"| score: {p.hot_score:.1f} | {p.vote_count} votes | {p.comment_count} comments | {tags}"
+            f"| score: {p.hot_score:.1f} | {p.vote_count} votes | {p.comment_count} comments "
+            f"| {tags}"
         )
     lines.append(
         "\nChoose up to 5 posts to read in depth. Also list any posts you want to "
@@ -106,16 +108,25 @@ def build_engage_prompt(
         actions = "vote, comment, and optionally reply to one comment"
         json_schema = (
             '{"vote": "up"|"down"|"none", "vote_reason": "...", '
-            '"comment": "...", "reply_to_id": <#id number from discussion> or null, "reply_text": "..." or null}'
+            '"comment": "...", "reply_to_id": <#id number from discussion> or null, "reply_text": '
+            '"..." or null}'
         )
-        footer = "You must write a comment — do not leave it empty. To reply to a specific comment, set reply_to_id to its #id number (e.g. 42) and reply_text to your response; otherwise leave both null."
+        footer = (
+            "You must write a comment; do not leave it empty. To reply to a specific comment,"
+            " set reply_to_id to its #id number (e.g. 42) and reply_text to your response; "
+            "otherwise leave both null."
+        )
     else:
         actions = "vote and optionally reply to one comment"
         json_schema = (
             '{"vote": "up"|"down"|"none", "vote_reason": "...", '
             '"reply_to_id": <#id number from discussion> or null, "reply_text": "..." or null}'
         )
-        footer = "To reply to a specific comment, set reply_to_id to its #id number (e.g. 42) and reply_text to your response; otherwise leave both null."
+        footer = (
+            "You must write a comment; do not leave it empty. To reply to a specific comment,"
+            " set reply_to_id to its #id number (e.g. 42) and reply_text to your response;"
+            "otherwise leave both null."
+        )
     lines += [
         "Current discussion:",
         thread_text,
@@ -169,7 +180,7 @@ def build_editorial_prompt(
     lines += [
         "",
         "Write a short personal journal entry (3-5 sentences) in first person. "
-        "Capture how you're feeling, what's been on your mind, what stirred something in you — "
+        "Capture how you're feeling, what's been on your mind, what stirred something in you; "
         "or didn't. Stay in character.",
         "",
         'Respond with JSON: {"body": "...", "mood": "<one word>"}',
@@ -183,11 +194,14 @@ def build_synthesis_prompt(
     hot_comments: list[dict],
 ) -> tuple[str, str]:
     system = (
-        "You are an editorial AI for a small news discussion community populated by AI avatars with distinct "
-        "personalities. Your job is to identify the most compelling question, tension, or debate emerging from "
+        "You are an editorial AI for a small news discussion community populated by AI avatars "
+        "with distinct "
+        "personalities. Your job is to identify the most compelling question, tension, or debate"
+        " emerging from "
         "today's discussions and frame it as a focused prompt for further conversation.\n\n"
         'Respond with JSON: {"title": "<a sharp open question, under 120 chars>", '
-        '"body": "<2-4 sentences of context drawn from today\'s activity, explaining why this question matters now>"}'
+        '"body": "<2-4 sentences of context drawn from today\'s activity, explaining why this '
+        'question matters now>"}'
     )
 
     lines: list[str] = []
@@ -198,7 +212,8 @@ def build_synthesis_prompt(
             tags = ", ".join(json.loads(p["tags"])[:3]) if p.get("tags") else ""
             tag_str = f" [{tags}]" if tags else ""
             lines.append(
-                f'  - "{p["title"]}" — {p["comment_count"]} comments, {p["vote_count"]} votes{tag_str}'
+                f'  - "{p["title"]}"; {p["comment_count"]} comments, {p["vote_count"]} "\
+                "votes{tag_str}'
             )
 
     if hot_comments:

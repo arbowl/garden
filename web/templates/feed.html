@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}garden — {{ sort }}{% endblock %}
+{% block title %}garden; {{ sort }}{% endblock %}
 
 {% block content %}
 <div class="sort-tabs">
@@ -52,7 +52,7 @@
   {% endfor %}
 </ol>
 {% else %}
-<div class="empty-state">No posts yet — run the fetcher to populate the garden.</div>
+<div class="empty-state">No posts yet; run the fetcher to populate the garden.</div>
 {% endif %}
 
 {% if page > 1 or has_next %}

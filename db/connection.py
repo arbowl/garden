@@ -45,7 +45,7 @@ async def init_db(db_path: str) -> aiosqlite.Connection:
 
 async def get_db() -> aiosqlite.Connection:
     if _db is None:
-        raise RuntimeError("Database not initialized — call init_db() first.")
+        raise RuntimeError("Database not initialized; call init_db() first.")
     return _db
 
 

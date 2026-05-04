@@ -78,12 +78,16 @@ async def archetype_import(request: Request, file: UploadFile = File(...)):
         data = json.loads(content)
     except Exception:
         return templates.TemplateResponse(
-            request, "admin/archetype_import.html", {"error": "Could not parse file — make sure it's a valid garden archetype JSON."}
+            request,
+            "admin/archetype_import.html",
+            {"error": "Could not parse file; make sure it's a valid garden archetype JSON."},
         )
 
     if data.get("garden_archetype") != "1":
         return templates.TemplateResponse(
-            request, "admin/archetype_import.html", {"error": "File does not look like a garden archetype export."}
+            request,
+            "admin/archetype_import.html",
+            {"error": "File does not look like a garden archetype export."},
         )
 
     def _listfield(v):
@@ -168,7 +172,9 @@ async def archetype_edit_form(request: Request, archetype_id: int):
     archetype = await get_archetype(db, archetype_id)
     if not archetype:
         raise HTTPException(status_code=404, detail="Archetype not found")
-    return templates.TemplateResponse(request, "admin/archetype_form.html", {"archetype": archetype})
+    return templates.TemplateResponse(
+        request, "admin/archetype_form.html", {"archetype": archetype}
+    )
 
 
 @router.post("/archetypes")

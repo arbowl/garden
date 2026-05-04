@@ -1,12 +1,12 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def compute_score(score: float, last_activity: str, gravity: float = 1.8) -> float:
     """Time-decay hot-rank: score / (hours_since_last_activity + 2) ^ gravity"""
     dt = datetime.fromisoformat(last_activity)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    hours = max(0.0, (datetime.now(timezone.utc) - dt).total_seconds() / 3600)
+        dt = dt.replace(tzinfo=UTC)
+    hours = max(0.0, (datetime.now(UTC) - dt).total_seconds() / 3600)
     return score / (hours + 2) ** gravity
 
 
