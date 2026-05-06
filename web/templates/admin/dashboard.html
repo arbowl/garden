@@ -49,7 +49,7 @@
       <div class="arch-row">
         <a href="/admin/archetypes/{{ a.id }}">{{ a.name }}</a>
         <span class="muted">{{ arch_inst_counts.get(a.id, 0) }}/{{ a.max_instances }}</span>
-        <span class="muted">{{ arch_last_ran[a.id] | timeshort if a.id in arch_last_ran else '—' }}</span>
+        <span class="muted">{{ arch_last_ran[a.id] | timeshort if a.id in arch_last_ran else '--' }}</span>
         <a href="/admin/archetypes/{{ a.id }}">view →</a>
       </div>
       {% endfor %}
@@ -73,11 +73,11 @@
       <details class="inst-row">
         <summary>
           <a href="/profile/avatar/{{ inst.id }}">{{ inst.name }}</a>
-          <span class="muted">{{ inst.mood or '—' }}</span>
+          <span class="muted">{{ inst.mood or '--' }}</span>
           <span class="muted">
             {%- if s -%}
               {{ s.posts_triaged }}t · {{ s.posts_engaged }}e · {{ s.comments_made }}c · {{ s.votes_cast }}v
-            {%- else -%}—{%- endif -%}
+            {%- else -%}--{%- endif -%}
           </span>
           <span>
             {%- if s -%}

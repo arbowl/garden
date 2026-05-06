@@ -53,7 +53,7 @@
     <details class="inst-row{% if loop.index > archetype.max_instances %} inst-row-overlimit{% endif %}">
       <summary>
         <a href="/profile/avatar/{{ inst.id }}">{{ inst.name }}</a>
-        <span class="muted">{{ inst.mood or '—' }}</span>
+        <span class="muted">{{ inst.mood or '--' }}</span>
       </summary>
       <div class="inst-row-detail">
         <span>{{ inst.session_count }} session{{ 's' if inst.session_count != 1 }} · {{ inst.last_session | timeshort if inst.last_session else 'never' }}</span>

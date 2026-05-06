@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 import aiosqlite
 
-from avatars.schema import DriftVector, Memory, build_system_prompt, post_affinity_score
+from avatars.schema import DriftVector, Memory, build_system_prompt, post_affinity_score, rel_instruction
 from avatars.threading import flatten_thread
 from config import settings
 from db.models import Archetype, AuthorType, Instance, Post
@@ -27,6 +27,7 @@ from db.queries import (
     get_instance,
     get_new_posts,
     get_pending_replies,
+    get_all_relationship_scores,
     get_relationships_for_prompt,
     get_unresolved_mention_posts_for_instance,
     insert_comment,
@@ -40,12 +41,14 @@ from db.queries import (
 )
 from llm.client import OllamaClient
 from llm.parsing import (
+    parse_comment_sentiment_response,
     parse_engagement_response,
     parse_react_response,
     parse_triage_response,
     parse_wind_down_response,
 )
 from llm.prompts import (
+    build_comment_sentiment_prompt,
     build_engage_prompt,
     build_react_prompt,
     build_triage_prompt,
@@ -87,6 +90,38 @@ def _reformat_bot_mentions(body: str, comments: list) -> str:
 
 _AFFINITY_WEIGHT = 1.0  # additive boost per matched-favor tag in pool ranking
 _MIN_ENGAGE = 2  # floor: force this many posts into engage_set if triage comes up short
+_REL_BIAS_SCALE = 0.12  # bias_p = |score| * scale -> max 12% nudge at the +/-1.0 threshold
+
+
+def _rel_nudge_direction(direction: int, rel_score: float | None) -> int | None:
+    """Nudge a comment vote direction based on a forming relationship.
+
+    Only active when abs(rel_score) < 1.0 -- above that threshold the relationship already
+    appears in the system prompt and the LLM's own reasoning carries the pattern forward.
+    Returns None to skip the vote (soften an opposing cast), or the original direction.
+    """
+    if rel_score is None or abs(rel_score) >= 1.0:
+        return direction
+    bias_p = abs(rel_score) * _REL_BIAS_SCALE
+    aligns = (rel_score > 0 and direction > 0) or (rel_score < 0 and direction < 0)
+    if aligns:
+        return direction
+    if random.random() < bias_p * 0.5:
+        return None
+    return direction
+
+
+def _rel_nudge_neutral(rel_score: float | None) -> int | None:
+    """For neutral sentiment, occasionally cast a vote in the relationship direction.
+
+    Returns 1, -1, or None (skip). Same +/-1.0 guard as _rel_nudge_direction.
+    """
+    if rel_score is None or abs(rel_score) >= 1.0:
+        return None
+    bias_p = abs(rel_score) * _REL_BIAS_SCALE
+    if random.random() < bias_p:
+        return 1 if rel_score > 0 else -1
+    return None
 
 
 @dataclass
@@ -107,6 +142,7 @@ class SessionStats:
     llm_calls: int = 0
     comment_snippets: list[str] = field(default_factory=list)
     topics_engaged: list[str] = field(default_factory=list)
+    pending_comment_votes: list[dict] = field(default_factory=list)
 
 
 class AvatarSession:
@@ -156,14 +192,21 @@ class AvatarSession:
         drift = DriftVector.from_dict(instance.drift_vector)
         memory = Memory.from_dict(instance.memory)
         relationships = await get_relationships_for_prompt(self.db, self.instance_id)
+        rel_scores = await get_all_relationship_scores(self.db, self.instance_id)
         system_prompt = build_system_prompt(archetype, drift, memory, relationships)
 
         session_id = await insert_session(self.db, self.instance_id)
         stats = SessionStats(session_id=session_id, instance_id=self.instance_id)
         logger.info("[%s] session %d started", instance.name, session_id)
 
+        rel_map = {
+            rel["object_id"]: rel_instruction(float(rel["score"]))
+            for rel in relationships
+            if rel_instruction(float(rel["score"]))
+        }
+
         try:
-            await self._run_phases(instance, archetype, drift, memory, system_prompt, stats)
+            await self._run_phases(instance, archetype, drift, memory, system_prompt, stats, rel_map, rel_scores)
         except Exception as e:
             logger.exception("[%s] session error: %s", instance.name, e)
             await update_session(self.db, session_id, error=str(e), ended=True)
@@ -219,6 +262,8 @@ class AvatarSession:
         memory: Memory,
         system_prompt: str,
         stats: SessionStats,
+        rel_map: dict[str, str] | None = None,
+        rel_scores: dict[str, float] | None = None,
     ) -> None:
         bias = instance.new_post_bias  # -1.0 = hot-heavy, 0.0 = default, 1.0 = new-heavy
 
@@ -383,14 +428,19 @@ class AvatarSession:
                 ctx,
                 stats,
                 mention_post_ids=mention_post_ids,
+                rel_map=rel_map,
+                rel_scores=rel_scores,
             )
             stats.posts_engaged += 1
             await update_session(self.db, stats.session_id, posts_engaged=stats.posts_engaged)
 
+        await update_session(self.db, stats.session_id, phase="comment_votes")
+        await self._batch_vote_comments(archetype, drift, system_prompt, stats, rel_scores=rel_scores)
+
         await update_session(self.db, stats.session_id, phase="react")
 
         if not self._over_budget():
-            await self._react(instance, archetype, memory, system_prompt, stats)
+            await self._react(instance, archetype, memory, system_prompt, stats, rel_map=rel_map)
 
     async def _triage(
         self,
@@ -409,6 +459,60 @@ class AvatarSession:
             logger.warning("[%s] triage parse failed", self.instance_id)
         return result
 
+    async def _batch_vote_comments(
+        self,
+        archetype: Archetype,
+        drift: "DriftVector",
+        system_prompt: str,
+        stats: SessionStats,
+        rel_scores: dict[str, float] | None = None,
+    ) -> None:
+        if not stats.pending_comment_votes:
+            return
+
+        system, user = build_comment_sentiment_prompt(system_prompt, stats.pending_comment_votes)
+        raw = await self._llm(self.disciplined, system, user, temperature=0.2)
+        stats.llm_calls += 1
+
+        result = parse_comment_sentiment_response(raw) if raw else None
+
+        for item in stats.pending_comment_votes:
+            cid = str(item["comment_id"])
+            post_vote = item["post_vote"]
+            author_id = item.get("author_id")
+            rel_score = rel_scores.get(author_id) if rel_scores and author_id else None
+
+            sentiment = result.votes.get(cid) if result else None
+
+            if sentiment is None:
+                direction = random.choice([-1, 1])
+            elif sentiment == "neutral":
+                nudged = _rel_nudge_neutral(rel_score)
+                if nudged is None:
+                    continue
+                direction = nudged
+            else:
+                # agree/disagree mapped through post stance
+                if post_vote == "up":
+                    direction = 1 if sentiment == "agree" else -1
+                elif post_vote == "down":
+                    direction = -1 if sentiment == "agree" else 1
+                else:  # abstained -- use sentiment directly
+                    direction = 1 if sentiment == "agree" else -1
+
+            direction = _rel_nudge_direction(direction, rel_score)
+            if direction is None:
+                continue
+
+            await insert_vote(
+                self.db,
+                voter_type=AuthorType.AVATAR,
+                direction=direction,
+                comment_id=item["comment_id"],
+                voter_id=self.instance_id,
+            )
+            stats.votes_cast += 1
+
     async def _engage(
         self,
         instance: Instance,
@@ -418,10 +522,12 @@ class AvatarSession:
         post_ctx: PostContext,
         stats: SessionStats,
         mention_post_ids: set[int] | None = None,
+        rel_map: dict[str, str] | None = None,
+        rel_scores: dict[str, float] | None = None,
     ) -> None:
         post = post_ctx.post
         comments = await get_comments_for_post(self.db, post.id)
-        thread_text = flatten_thread(comments, instance_name=instance.name)
+        thread_text = flatten_thread(comments, instance_name=instance.name, rel_map=rel_map)
 
         allow_comment = post_ctx.must_comment or random.random() < archetype.comment_threshold
         system, user = build_engage_prompt(
@@ -450,20 +556,20 @@ class AvatarSession:
             stats.votes_cast += 1
             memory.add_vote(post.title, direction, result.vote_reason)
 
+        post_vote = result.vote if result else "none"
         for c in comments[:10]:
             if c.author_id == self.instance_id:
                 continue
             if random.random() >= archetype.vote_probability:
                 continue
-            direction = -1 if random.random() < archetype.contrarian_factor else 1
-            await insert_vote(
-                self.db,
-                voter_type=AuthorType.AVATAR,
-                direction=direction,
-                comment_id=c.id,
-                voter_id=self.instance_id,
-            )
-            stats.votes_cast += 1
+            stats.pending_comment_votes.append({
+                "comment_id": c.id,
+                "author_id": c.author_id,
+                "author_name": c.author_name,
+                "body": c.body,
+                "post_title": post.title,
+                "post_vote": post_vote,
+            })
 
         if post.tags:
             stats.topics_engaged.extend(post.tags[:2])
@@ -546,6 +652,7 @@ class AvatarSession:
         memory: Memory,
         system_prompt: str,
         stats: SessionStats,
+        rel_map: dict[str, str] | None = None,
     ) -> None:
         pending = await get_pending_replies(
             self.db, self.instance_id, max_depth=settings.max_reply_depth
@@ -585,12 +692,17 @@ class AvatarSession:
                 row = await cur.fetchone()
             post_title = row["title"] if row else "(unknown)"
 
+            rel_note: str | None = None
+            if rel_map and reply.author_id and reply.author_id in rel_map:
+                rel_note = f"[{reply.author_name}: {rel_map[reply.author_id]}]"
+
             system, user = build_react_prompt(
                 system_prompt,
                 reply_comment_body=reply.body,
                 reply_author=reply.author_name,
                 my_comment_body=my_body,
                 post_title=post_title,
+                rel_note=rel_note,
             )
             raw = await self._llm(self.creative, system, user, temperature=archetype.temperature)
             stats.llm_calls += 1

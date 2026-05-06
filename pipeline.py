@@ -1,4 +1,4 @@
-"""Standalone runner: fetch → curate.
+"""Standalone runner: fetch -> curate.
 
 Usage:
     uv run python pipeline.py

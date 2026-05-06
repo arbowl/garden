@@ -193,3 +193,27 @@ class SynthesisResponse(BaseModel):
 
 def parse_synthesis_response(raw: str) -> SynthesisResponse | None:
     return _parse(raw, SynthesisResponse)  # type: ignore[return-value]
+
+
+class CommentSentimentResponse(BaseModel):
+    votes: dict[str, Literal["agree", "disagree", "neutral"]] = {}
+
+    @field_validator("votes", mode="before")
+    @classmethod
+    def clean_votes(cls, v: object) -> dict[str, str]:
+        if not isinstance(v, dict):
+            return {}
+        valid = {"agree", "disagree", "neutral"}
+        return {str(k): (val if val in valid else "neutral") for k, val in list(v.items())[:50]}
+
+
+def parse_comment_sentiment_response(raw: str) -> CommentSentimentResponse | None:
+    try:
+        data = json.loads(_clean_json(raw))
+        # LLM may return the dict directly rather than wrapped in {"votes": ...}
+        if isinstance(data, dict) and "votes" not in data:
+            data = {"votes": data}
+        return CommentSentimentResponse.model_validate(data)
+    except Exception as e:
+        logger.debug("Failed to parse CommentSentimentResponse: %s | raw=%r", e, raw[:200])
+        return None

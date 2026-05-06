@@ -1,0 +1,61 @@
+{% macro render_relationships(relationships) %}
+<div class="profile-relationships">
+  <div class="rel-label">relationships</div>
+  <div class="rel-cards">
+    {% if relationships.best %}
+    <a class="rel-card rel-card-pos" href="{% if relationships.best.instance_id %}/profile/avatar/{{ relationships.best.instance_id }}{% else %}/profile/you{% endif %}">
+      <span class="rel-card-bond">friend</span>
+      <span class="rel-card-name">{{ relationships.best.object_name }}</span>
+      <span class="rel-card-score rel-pos">+{{ relationships.best.score | round(1) }}</span>
+    </a>
+    {% else %}
+    <div class="rel-card rel-card-empty">
+      <span class="rel-card-bond">friend</span>
+      <span class="rel-card-name rel-card-none">no one yet</span>
+    </div>
+    {% endif %}
+    {% if relationships.worst %}
+    <a class="rel-card rel-card-neg" href="{% if relationships.worst.instance_id %}/profile/avatar/{{ relationships.worst.instance_id }}{% else %}/profile/you{% endif %}">
+      <span class="rel-card-bond">rival</span>
+      <span class="rel-card-name">{{ relationships.worst.object_name }}</span>
+      <span class="rel-card-score rel-neg">{{ relationships.worst.score | round(1) }}</span>
+    </a>
+    {% else %}
+    <div class="rel-card rel-card-empty">
+      <span class="rel-card-bond">rival</span>
+      <span class="rel-card-name rel-card-none">no one yet</span>
+    </div>
+    {% endif %}
+  </div>
+  <div class="rel-inverse">
+    {% for col_name, col_rows, score_class in [
+         ('friend of', relationships.friend_of, 'rel-pos'),
+         ('rival to',  relationships.rival_to,  'rel-neg')] %}
+    <div class="rel-inverse-col">
+      <div class="rel-inverse-heading">{{ col_name }}</div>
+      {% if col_rows %}
+      {% set first = col_rows[0] %}
+      {% set rest  = col_rows[1:] %}
+      <div class="rel-inverse-row">
+        <a href="{% if first.instance_id %}/profile/avatar/{{ first.instance_id }}{% else %}/profile/you{% endif %}">{{ first.subject_name }}</a>
+        <span class="{{ score_class }}">{{ ('+' if first.score > 0 else '') }}{{ first.score | round(1) }}</span>
+      </div>
+      {% if rest %}
+      <details class="rel-inverse-more">
+        <summary>{{ rest | length }} more</summary>
+        {% for r in rest %}
+        <div class="rel-inverse-row">
+          <a href="{% if r.instance_id %}/profile/avatar/{{ r.instance_id }}{% else %}/profile/you{% endif %}">{{ r.subject_name }}</a>
+          <span class="{{ score_class }}">{{ ('+' if r.score > 0 else '') }}{{ r.score | round(1) }}</span>
+        </div>
+        {% endfor %}
+      </details>
+      {% endif %}
+      {% else %}
+      <div class="rel-inverse-row rel-inverse-empty">no one</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}

@@ -42,13 +42,18 @@ def _collect_chain(
     return chain
 
 
-def _format_comment(comment: Comment) -> str:
+def _format_comment(comment: Comment, instruction: str | None = None) -> str:
     indent = "  " * comment.depth
-    return f"{indent}[#{comment.id} {comment.author_name}] {comment.body}"
+    author = f"{comment.author_name} ({instruction})" if instruction else comment.author_name
+    return f"{indent}[#{comment.id} {author}] {comment.body}"
 
 
-def _format_chain(chain: list[Comment]) -> str:
-    return "\n".join(_format_comment(c) for c in chain)
+def _format_chain(chain: list[Comment], rel_map: dict[str, str] | None = None) -> str:
+    lines = []
+    for c in chain:
+        instruction = rel_map.get(c.author_id) if rel_map and c.author_id else None
+        lines.append(_format_comment(c, instruction))
+    return "\n".join(lines)
 
 
 def flatten_thread(
@@ -58,6 +63,7 @@ def flatten_thread(
     max_chains: int = 6,
     max_per_chain: int = 4,
     token_budget: int = 800,
+    rel_map: dict[str, str] | None = None,
 ) -> str:
     if not comments:
         return "(no comments yet)"
@@ -81,7 +87,7 @@ def flatten_thread(
     sections: list[str] = []
 
     for _, chain in top_chains:
-        text = _format_chain(chain)
+        text = _format_chain(chain, rel_map=rel_map)
         tokens = _estimate_tokens(text)
         if tokens > budget_remaining:
             break

@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import math
 import random
+from datetime import datetime, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore
 
@@ -48,7 +50,20 @@ async def avatar_job() -> None:
     if not instances:
         logger.info("[scheduler] no active instances, skipping")
         return
-    instance = random.choice(instances)
+    now = datetime.now(timezone.utc)
+
+    def _staleness_weight(last_session: str | None) -> float:
+        if not last_session:
+            return 1 + math.sqrt(168)  # treat never-run as ~1 week stale
+        try:
+            last = datetime.fromisoformat(last_session).replace(tzinfo=timezone.utc)
+        except ValueError:
+            return 1.0
+        hours = max(0.0, (now - last).total_seconds() / 3600)
+        return 1 + math.sqrt(hours)
+
+    weights = [_staleness_weight(inst.last_session) for inst in instances]
+    instance = random.choices(instances, weights=weights, k=1)[0]
     logger.info("[scheduler] running session for %s (%s)", instance.name, instance.id)
     await broadcaster.publish({"type": "session_start", "instance_name": instance.name})
     disciplined = OllamaClient(

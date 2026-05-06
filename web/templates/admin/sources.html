@@ -23,7 +23,7 @@
       <td>{{ s.name }}</td>
       <td class="muted source-url">{{ s.url }}</td>
       <td class="muted">{{ s.type }}</td>
-      <td class="muted">{{ s.tags | join(', ') or '—' }}</td>
+      <td class="muted">{{ s.tags | join(', ') or '--' }}</td>
       <td class="muted">{{ s.trust_level }}</td>
       <td class="source-actions">
         <form method="post" action="/admin/sources/fetch" style="display:inline">

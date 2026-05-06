@@ -123,9 +123,9 @@ def build_engage_prompt(
             '"reply_to_id": <#id number from discussion> or null, "reply_text": "..." or null}'
         )
         footer = (
-            "You must write a comment; do not leave it empty. To reply to a specific comment,"
+            "To reply to a specific comment,"
             " set reply_to_id to its #id number (e.g. 42) and reply_text to your response;"
-            "otherwise leave both null."
+            " otherwise leave both null."
         )
     lines += [
         "Current discussion:",
@@ -144,15 +144,19 @@ def build_react_prompt(
     reply_author: str,
     my_comment_body: str,
     post_title: str,
+    rel_note: str | None = None,
 ) -> tuple[str, str]:
-    user = (
-        f'On "{post_title}", someone replied to your comment.\n\n'
-        f"Your comment: {my_comment_body}\n"
-        f"  [{reply_author}] {reply_comment_body}\n\n"
-        "Do you want to continue this conversation?\n"
-        'Respond with JSON: {"reply": "your response" or null}'
-    )
-    return system_prompt, user
+    lines = [f'On "{post_title}", someone replied to your comment.', ""]
+    if rel_note:
+        lines += [rel_note, ""]
+    lines += [
+        f"Your comment: {my_comment_body}",
+        f"  [{reply_author}] {reply_comment_body}",
+        "",
+        "Do you want to continue this conversation?",
+        'Respond with JSON: {"reply": "your response" or null}',
+    ]
+    return system_prompt, "\n".join(lines)
 
 
 def build_editorial_prompt(
@@ -166,7 +170,7 @@ def build_editorial_prompt(
     if sessions:
         lines.append(f"\nYou had {len(sessions)} session(s) today:")
         for s in sessions:
-            mood = s.get("mood") or "—"
+            mood = s.get("mood") or "--"
             summary = s.get("summary") or ""
             engaged = s.get("posts_engaged", 0)
             comments = s.get("comments_made", 0)
@@ -212,8 +216,7 @@ def build_synthesis_prompt(
             tags = ", ".join(json.loads(p["tags"])[:3]) if p.get("tags") else ""
             tag_str = f" [{tags}]" if tags else ""
             lines.append(
-                f'  - "{p["title"]}"; {p["comment_count"]} comments, {p["vote_count"]} "\
-                "votes{tag_str}'
+                f'  - "{p["title"]}" -- {p["comment_count"]} comments, {p["vote_count"]} votes{tag_str}'
             )
 
     if hot_comments:
@@ -233,6 +236,42 @@ def build_synthesis_prompt(
 
     lines.append("\nWhat single question or debate should the community dig into next?")
     return system, "\n".join(lines)
+
+
+def build_comment_sentiment_prompt(
+    system_prompt: str,
+    pending: list[dict],
+) -> tuple[str, str]:
+    """Batch sentiment prompt for comment voting.
+
+    Each entry in pending: {comment_id, author_name, body, post_title, post_vote}
+    post_vote is "up", "down", or "none".
+    """
+    # Group by (post_title, post_vote) preserving insertion order
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for item in pending:
+        key = (item["post_title"], item["post_vote"])
+        groups.setdefault(key, []).append(item)
+
+    lines = [
+        "You just read and reacted to several posts. Now look at the comments on those posts "
+        "and decide which you agree or disagree with, given your reaction to each article.\n"
+    ]
+    for (post_title, post_vote), items in groups.items():
+        stance = f"you voted {post_vote.upper()}" if post_vote != "none" else "you did not vote"
+        lines.append(f'[Post: "{post_title}" - {stance}]')
+        for item in items:
+            body = item["body"][:200].replace("\n", " ")
+            lines.append(f'  [#{item["comment_id"]}] {item["author_name"]}: {body}')
+        lines.append("")
+
+    ids = ", ".join(str(item["comment_id"]) for item in pending)
+    lines += [
+        'For each comment respond "agree", "disagree", or "neutral".',
+        f"Return JSON with exactly these keys: {{{ids}}}",
+        'Example: {"123": "agree", "124": "disagree"}',
+    ]
+    return system_prompt, "\n".join(lines)
 
 
 def build_wind_down_prompt(

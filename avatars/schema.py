@@ -128,14 +128,36 @@ _REL_PROMPT_LABELS = [
     (-1.0, "someone you're wary of"),
 ]
 
+_REL_INSTRUCTIONS = [
+    (5.0, "respond with real warmth and familiarity, like an old friend"),
+    (4.0, "be openly warm and enthusiastic toward them"),
+    (3.0, "go out of your way to agree or build on their point"),
+    (2.0, "be agreeable and friendly toward them"),
+    (1.0, "be a bit warmer than usual with them"),
+    (-1.0, "be a bit cooler or more skeptical than usual"),
+    (-2.0, "be openly dismissive or critical of their take"),
+    (-3.0, "look for something to push back on or undercut"),
+    (-4.0, "be openly hostile or contemptuous toward them"),
+    (-5.0, "treat them with undisguised contempt, don't hold back"),
+]
 
-def _rel_prompt_label(score: float) -> str:
+
+def rel_label(score: float) -> str:
     for threshold, label in _REL_PROMPT_LABELS:
         if threshold > 0 and score >= threshold:
             return label
         if threshold < 0 and score <= threshold:
             return label
     return "someone you're wary of"
+
+
+def rel_instruction(score: float) -> str:
+    for threshold, instruction in _REL_INSTRUCTIONS:
+        if threshold > 0 and score >= threshold:
+            return instruction
+        if threshold < 0 and score <= threshold:
+            return instruction
+    return ""
 
 
 def build_system_prompt(
@@ -186,7 +208,7 @@ def build_system_prompt(
         for rel in relationships:
             name = rel["object_name"]
             score = float(rel["score"])
-            label = _rel_prompt_label(score)
+            label = rel_label(score)
             if score > 0:
                 rel_lines.append(f"You feel warmly toward {name}; you consider them {label}.")
             else:

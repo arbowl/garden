@@ -826,8 +826,7 @@ async def insert_comment(
 
     async with db.execute(
         """
-        INSERT INTO comments (post_id, parent_comment_id, author_type, author_id, author_name, "
-        "body, depth)
+        INSERT INTO comments (post_id, parent_comment_id, author_type, author_id, author_name, body, depth)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (post_id, parent_comment_id, author_type.value, author_id, author_name, body, depth),
@@ -853,6 +852,8 @@ async def upsert_relationship(
     object_id: str,
     vote_delta: int,
 ) -> None:
+    if subject_id == object_id:
+        return
     async with db.execute(
         "SELECT score FROM relationships WHERE subject_id = ? AND object_id = ?",
         (subject_id, object_id),
@@ -893,7 +894,7 @@ async def _apply_comment_vote_relationship(
             return
         object_id = author_id
     else:
-        object_id = "human"
+        object_id = "you"
     await upsert_relationship(db, voter_id, object_id, delta)
 
 
@@ -944,8 +945,7 @@ async def insert_vote(
                     "UPDATE comments SET vote_count = vote_count + ? WHERE id = ?",
                     (delta, comment_id),
                 )
-                if voter_type == AuthorType.AVATAR:
-                    await _apply_comment_vote_relationship(db, voter_id, comment_id, delta)
+                await _apply_comment_vote_relationship(db, voter_id, comment_id, delta)
             await db.commit()
             return True
 
@@ -967,7 +967,7 @@ async def insert_vote(
             "UPDATE comments SET vote_count = vote_count + ? WHERE id = ?",
             (direction, comment_id),
         )
-        if voter_type == AuthorType.AVATAR and voter_id is not None:
+        if voter_id is not None:
             await _apply_comment_vote_relationship(db, voter_id, comment_id, direction)
     await db.commit()
     return True
@@ -1538,11 +1538,24 @@ async def get_relationships_for_prompt(
     return [dict(r) for r in rows]
 
 
+async def get_all_relationship_scores(
+    db: aiosqlite.Connection,
+    instance_id: str,
+) -> dict[str, float]:
+    """All outgoing relationship scores, keyed by object_id. No threshold filter."""
+    async with db.execute(
+        "SELECT object_id, score FROM relationships WHERE subject_id = ?",
+        (instance_id,),
+    ) as cur:
+        rows = await cur.fetchall()
+    return {row["object_id"]: float(row["score"]) for row in rows}
+
+
 async def get_profile_relationships(
     db: aiosqlite.Connection,
     instance_id: str,
 ) -> dict:
-    """Best and worst relationship for profile display (abs >= 3.0)."""
+    """Best/worst outgoing and incoming relationships for profile display (abs >= 1.0)."""
     async with db.execute(
         """
         SELECT r.object_id, r.score,
@@ -1550,12 +1563,28 @@ async def get_profile_relationships(
                i.id as instance_id
         FROM relationships r
         LEFT JOIN instances i ON i.id = r.object_id
-        WHERE r.subject_id = ? AND ABS(r.score) >= 3.0
-        ORDER BY r.score DESC
+        WHERE r.subject_id = ? AND ABS(r.score) >= 1.0
+        ORDER BY ABS(r.score) DESC
         """,
         (instance_id,),
     ) as cur:
-        rows = [dict(r) for r in await cur.fetchall()]
-    best = rows[0] if rows and rows[0]["score"] > 0 else None
-    worst = rows[-1] if rows and rows[-1]["score"] < 0 else None
-    return {"best": best, "worst": worst}
+        out_rows = [dict(r) for r in await cur.fetchall()]
+    async with db.execute(
+        """
+        SELECT r.subject_id, r.score,
+               COALESCE(i.name, 'you') as subject_name,
+               i.id as instance_id
+        FROM relationships r
+        LEFT JOIN instances i ON i.id = r.subject_id
+        WHERE r.object_id = ? AND ABS(r.score) >= 1.0
+        ORDER BY ABS(r.score) DESC
+        """,
+        (instance_id,),
+    ) as cur:
+        in_rows = [dict(r) for r in await cur.fetchall()]
+    return {
+        "best": next((r for r in out_rows if r["score"] > 0), None),
+        "worst": next((r for r in out_rows if r["score"] < 0), None),
+        "friend_of": [r for r in in_rows if r["score"] > 0],
+        "rival_to": [r for r in in_rows if r["score"] < 0],
+    }

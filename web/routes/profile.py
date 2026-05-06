@@ -129,6 +129,7 @@ async def human_profile(request: Request, cp: int = 1, vp: int = 1, tab: str = "
     votes = await get_human_votes(db, limit=_PER_PAGE, offset=(vp - 1) * _PER_PAGE)
     comment_pages = max(1, -(-comment_total // _PER_PAGE))
     vote_pages = max(1, -(-vote_total // _PER_PAGE))
+    relationships = await get_profile_relationships(db, "you")
     return templates.TemplateResponse(
         request,
         "profile/you.html",
@@ -142,6 +143,7 @@ async def human_profile(request: Request, cp: int = 1, vp: int = 1, tab: str = "
             "vote_page": vp,
             "vote_pages": vote_pages,
             "karma": karma,
+            "relationships": relationships,
             "tab": tab,
         },
     )

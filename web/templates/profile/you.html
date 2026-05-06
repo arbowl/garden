@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/relationships.html" import render_relationships %}
 {% block title %}your profile; garden{% endblock %}
 
 {% macro paginate(page, pages, param, other_params) %}
@@ -19,6 +20,7 @@
     <div class="stat-box"><span class="stat-num">{{ vote_total }}</span><span class="stat-label">votes cast</span></div>
     <div class="stat-box"><span class="stat-num">{{ karma }}</span><span class="stat-label">karma</span></div>
   </div>
+  {{ render_relationships(relationships) }}
 </div>
 
 <div class="profile-tabs-wrapper">
@@ -38,7 +40,7 @@
       <div class="comment-row">
         <a href="/post/{{ c.post_id }}#comment-{{ c.id }}">{{ c.post_title }}</a>
         <span class="{% if c.vote_count > 0 %}pos{% elif c.vote_count < 0 %}neg{% else %}muted{% endif %}">
-          {%- if c.vote_count > 0 %}+{{ c.vote_count }}{% elif c.vote_count < 0 %}{{ c.vote_count }}{% else %}—{% endif -%}
+          {%- if c.vote_count > 0 %}+{{ c.vote_count }}{% elif c.vote_count < 0 %}{{ c.vote_count }}{% else %}--{% endif -%}
         </span>
         <span class="muted">{{ c.created_at | timeshort }}</span>
         <div class="comment-row-body">{{ c.body }}</div>
