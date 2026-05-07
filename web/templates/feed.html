@@ -22,10 +22,11 @@
   {% for post in posts %}
   <li class="post-row">
     <span class="post-rank">{{ (page - 1) * 25 + loop.index }}</span>
-    {% include "partials/vote_col.html" %}
+    {% set my_vote = my_votes.get(post.id, 0) %}{% include "partials/vote_col.html" %}
     <div class="post-main">
       <div class="post-title">
         <a href="{{ post.url }}" target="_blank" rel="noopener noreferrer">{{ post.title }}</a>
+        {% set post_id = post.id %}{% set saved = post.id in saved_ids %}{% include "partials/star_btn.html" %}
         <span class="post-domain">({{ post.url | domain }})</span>
       </div>
       <div class="post-meta">

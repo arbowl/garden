@@ -26,6 +26,7 @@ from web.routes import events as events_routes
 from web.routes import feed as feed_routes
 from web.routes import inbox as inbox_routes
 from web.routes import profile as profile_routes
+from web.routes import saved as saved_routes
 from web.routes import sidebar as sidebar_routes
 
 logger = logging.getLogger(__name__)
@@ -79,4 +80,5 @@ app.include_router(admin_routes.router)
 app.include_router(inbox_routes.router)
 app.include_router(profile_routes.router)
 app.include_router(board_routes.router)
+app.include_router(saved_routes.router)
 app.include_router(sidebar_routes.router)

@@ -1642,3 +1642,112 @@ async def get_profile_relationships(
         "friend_of": [r for r in in_rows if r["score"] > 0],
         "rival_to": [r for r in in_rows if r["score"] < 0],
     }
+
+
+async def toggle_saved_post(db: aiosqlite.Connection, post_id: int) -> bool:
+    """Toggle saved state for a post. Returns True if now saved, False if unsaved."""
+    async with db.execute("SELECT 1 FROM saved_posts WHERE post_id = ?", (post_id,)) as cur:
+        exists = await cur.fetchone()
+    if exists:
+        await db.execute("DELETE FROM saved_posts WHERE post_id = ?", (post_id,))
+        await db.commit()
+        return False
+    else:
+        await db.execute(
+            "INSERT INTO saved_posts (post_id) VALUES (?)",
+            (post_id,),
+        )
+        await db.commit()
+        return True
+
+
+async def is_post_saved(db: aiosqlite.Connection, post_id: int) -> bool:
+    async with db.execute("SELECT 1 FROM saved_posts WHERE post_id = ?", (post_id,)) as cur:
+        return (await cur.fetchone()) is not None
+
+
+async def get_saved_post_ids(db: aiosqlite.Connection) -> set[int]:
+    async with db.execute("SELECT post_id FROM saved_posts") as cur:
+        rows = await cur.fetchall()
+    return {row["post_id"] for row in rows}
+
+
+async def get_saved_posts(
+    db: aiosqlite.Connection, limit: int = 26, offset: int = 0
+) -> list[Post]:
+    async with db.execute(
+        """
+        SELECT p.* FROM posts p
+        JOIN saved_posts s ON s.post_id = p.id
+        ORDER BY s.saved_at DESC
+        LIMIT ? OFFSET ?
+        """,
+        (limit, offset),
+    ) as cur:
+        rows = await cur.fetchall()
+    return [_row_to_post(r) for r in rows]
+
+
+async def get_my_post_votes(db: aiosqlite.Connection, post_ids: list[int]) -> dict[int, int]:
+    """Return {post_id: direction} for posts where voter_id='you'. Missing = no vote."""
+    if not post_ids:
+        return {}
+    placeholders = ",".join("?" * len(post_ids))
+    async with db.execute(
+        f"SELECT post_id, direction FROM votes WHERE voter_id = 'you' AND post_id IN ({placeholders})",
+        post_ids,
+    ) as cur:
+        rows = await cur.fetchall()
+    return {row["post_id"]: row["direction"] for row in rows}
+
+
+async def get_my_comment_votes(db: aiosqlite.Connection, comment_ids: list[int]) -> dict[int, int]:
+    """Return {comment_id: direction} for comments where voter_id='you'. Missing = no vote."""
+    if not comment_ids:
+        return {}
+    placeholders = ",".join("?" * len(comment_ids))
+    async with db.execute(
+        f"SELECT comment_id, direction FROM votes WHERE voter_id = 'you' AND comment_id IN ({placeholders})",
+        comment_ids,
+    ) as cur:
+        rows = await cur.fetchall()
+    return {row["comment_id"]: row["direction"] for row in rows}
+
+
+async def retract_vote(
+    db: aiosqlite.Connection,
+    voter_id: str,
+    post_id: int | None = None,
+    comment_id: int | None = None,
+) -> bool:
+    """Remove a human vote. Returns True if a vote was removed."""
+    if post_id is not None:
+        async with db.execute(
+            "SELECT id, direction FROM votes WHERE post_id = ? AND voter_id = ?",
+            (post_id, voter_id),
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return False
+        await db.execute("DELETE FROM votes WHERE id = ?", (row["id"],))
+        await db.execute(
+            "UPDATE posts SET vote_count = vote_count - ?, last_activity = datetime('now') WHERE id = ?",
+            (row["direction"], post_id),
+        )
+    elif comment_id is not None:
+        async with db.execute(
+            "SELECT id, direction FROM votes WHERE comment_id = ? AND voter_id = ?",
+            (comment_id, voter_id),
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return False
+        await db.execute("DELETE FROM votes WHERE id = ?", (row["id"],))
+        await db.execute(
+            "UPDATE comments SET vote_count = vote_count - ? WHERE id = ?",
+            (row["direction"], comment_id),
+        )
+    else:
+        return False
+    await db.commit()
+    return True

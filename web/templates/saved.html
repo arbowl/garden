@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}saved; garden{% endblock %}
+
+{% block content %}
+<h2 style="margin-bottom:12px">saved</h2>
+
+{% if posts %}
+<ol class="post-list">
+  {% for post in posts %}
+  <li class="post-row">
+    <span class="post-rank">{{ (page - 1) * 25 + loop.index }}</span>
+    {% include "partials/vote_col.html" %}
+    <div class="post-main">
+      <div class="post-title">
+        <a href="{{ post.url }}" target="_blank" rel="noopener noreferrer">{{ post.title }}</a>
+        {% set post_id = post.id %}{% set saved = true %}{% include "partials/star_btn.html" %}
+        <span class="post-domain">({{ post.url | domain }})</span>
+      </div>
+      <div class="post-meta">
+        {% if post.urgency == 'high' %}<span class="badge-urgent">urgent</span><span class="dot">·</span>{% endif %}
+        {% for tag in post.tags[:3] %}<span class="tag">{{ tag }}</span>{% endfor %}
+        {% if post.tags %}<span class="dot">·</span>{% endif %}
+        {{ post.source_name }}
+        <span class="dot">·</span>
+        {{ post.created_at | timeago }}
+        <span class="dot">·</span>
+        <a href="/post/{{ post.id }}">{{ post.comment_count }} comment{{ 's' if post.comment_count != 1 else '' }}</a>
+      </div>
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<div class="empty-state">Nothing saved yet. Star a post to save it.</div>
+{% endif %}
+
+{% if page > 1 or has_next %}
+<div class="pagination">
+  {% if page > 1 %}
+  <a href="?page={{ page - 1 }}" class="page-btn">‹ prev</a>
+  {% else %}
+  <span class="page-btn disabled">‹ prev</span>
+  {% endif %}
+  <span class="page-num">page {{ page }}</span>
+  {% if has_next %}
+  <a href="?page={{ page + 1 }}" class="page-btn">next ›</a>
+  {% else %}
+  <span class="page-btn disabled">next ›</span>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

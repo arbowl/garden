@@ -157,3 +157,8 @@ CREATE TABLE IF NOT EXISTS relationships (
 );
 
 CREATE INDEX IF NOT EXISTS idx_relationships_subject ON relationships(subject_id);
+
+CREATE TABLE IF NOT EXISTS saved_posts (
+    post_id    INTEGER PRIMARY KEY REFERENCES posts(id) ON DELETE CASCADE,
+    saved_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);

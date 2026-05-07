@@ -1,4 +1,4 @@
-{% macro render_comment(node, depth=0, locked=False, mention_map={}) %}
+{% macro render_comment(node, depth=0, locked=False, mention_map={}, my_comment_votes={}) %}
 <li class="comment" id="comment-{{ node.comment.id }}">
   <div class="comment-meta">
     <button type="button" class="collapse-btn" onclick="toggleCollapse(this)" title="collapse">[-]</button>
@@ -11,7 +11,7 @@
     <span class="dot">·</span>
     {{ node.comment.created_at | timeago }}
     <span class="dot">·</span>
-    {% set comment = node.comment %}{% include "partials/comment_vote.html" %}
+    {% set comment = node.comment %}{% set my_vote = my_comment_votes.get(node.comment.id, 0) %}{% include "partials/comment_vote.html" %}
     {% if not locked %}
     <span class="dot">·</span>
     <a class="reply-toggle" href="#reply-{{ node.comment.id }}"
@@ -62,14 +62,14 @@
     <summary class="deep-replies-toggle">{{ node.children | length }} more repl{{ 'y' if node.children | length == 1 else 'ies' }}</summary>
     <ul class="comment-children" id="children-{{ node.comment.id }}">
       {% for child in node.children %}
-        {{ render_comment(child, depth + 1, locked=locked, mention_map=mention_map) }}
+        {{ render_comment(child, depth + 1, locked=locked, mention_map=mention_map, my_comment_votes=my_comment_votes) }}
       {% endfor %}
     </ul>
   </details>
   {% else %}
   <ul class="comment-children" id="children-{{ node.comment.id }}">
     {% for child in node.children %}
-      {{ render_comment(child, depth + 1, locked=locked, mention_map=mention_map) }}
+      {{ render_comment(child, depth + 1, locked=locked, mention_map=mention_map, my_comment_votes=my_comment_votes) }}
     {% endfor %}
   </ul>
   {% endif %}

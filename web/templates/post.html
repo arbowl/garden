@@ -8,7 +8,7 @@
   <div class="post-header-inner">
     {% include "partials/vote_col.html" %}
     <div>
-      <h1><a href="{{ post.url }}" target="_blank" rel="noopener noreferrer">{{ post.title }}</a></h1>
+      <h1><a href="{{ post.url }}" target="_blank" rel="noopener noreferrer">{{ post.title }}</a> {% set post_id = post.id %}{% include "partials/star_btn.html" %}</h1>
       <div class="post-meta">
         {{ post.source_name }}
         <span class="dot">·</span>
@@ -56,7 +56,7 @@
 
   <ul class="comment-tree" id="comment-tree">
     {% for node in comments %}
-      {{ render_comment(node, locked=locked, mention_map=mention_map) }}
+      {{ render_comment(node, locked=locked, mention_map=mention_map, my_comment_votes=my_comment_votes) }}
     {% endfor %}
   </ul>
   {% if not comments %}

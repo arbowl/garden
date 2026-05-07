@@ -1,12 +1,12 @@
 <span id="comment-vote-{{ comment.id }}" class="comment-vote">
-  <button class="vote-btn"
+  <button class="vote-btn{% if my_vote == 1 %} voted{% endif %}"
     hx-post="/vote-comment"
     hx-vals='{"comment_id": "{{ comment.id }}", "direction": "1"}'
     hx-target="#comment-vote-{{ comment.id }}"
     hx-swap="outerHTML"
     title="upvote">▲</button>
   {{ comment.vote_count }}
-  <button class="vote-btn"
+  <button class="vote-btn{% if my_vote == -1 %} voted{% endif %}"
     hx-post="/vote-comment"
     hx-vals='{"comment_id": "{{ comment.id }}", "direction": "-1"}'
     hx-target="#comment-vote-{{ comment.id }}"

@@ -10,10 +10,14 @@ from db.queries import (
     get_comments_for_post,
     get_hot_posts,
     get_mentions_for_post,
+    get_my_comment_votes,
+    get_my_post_votes,
     get_new_posts,
     get_post,
     get_posts_by_status,
+    get_saved_post_ids,
     get_top_posts,
+    is_post_saved,
 )
 from web.templating import templates
 
@@ -54,6 +58,9 @@ async def feed_hot(request: Request, page: int = Query(1, ge=1)):
     else:
         has_next = len(posts) > PAGE_SIZE
         posts = posts[:PAGE_SIZE]
+    saved_ids = await get_saved_post_ids(db)
+    post_ids = [p.id for p in posts]
+    my_votes = await get_my_post_votes(db, post_ids)
     return templates.TemplateResponse(
         request,
         "feed.html",
@@ -62,6 +69,8 @@ async def feed_hot(request: Request, page: int = Query(1, ge=1)):
             "sort": "hot",
             "page": page,
             "has_next": has_next,
+            "saved_ids": saved_ids,
+            "my_votes": my_votes,
         },
     )
 
@@ -73,6 +82,9 @@ async def feed_new(request: Request, page: int = Query(1, ge=1)):
     posts = await get_new_posts(db, limit=PAGE_SIZE + 1, offset=offset)
     has_next = len(posts) > PAGE_SIZE
     posts = posts[:PAGE_SIZE]
+    saved_ids = await get_saved_post_ids(db)
+    post_ids = [p.id for p in posts]
+    my_votes = await get_my_post_votes(db, post_ids)
     return templates.TemplateResponse(
         request,
         "feed.html",
@@ -81,6 +93,8 @@ async def feed_new(request: Request, page: int = Query(1, ge=1)):
             "sort": "new",
             "page": page,
             "has_next": has_next,
+            "saved_ids": saved_ids,
+            "my_votes": my_votes,
         },
     )
 
@@ -104,6 +118,9 @@ async def feed_top(request: Request, page: int = Query(1, ge=1), since: str = Qu
     )
     has_next = len(posts) > PAGE_SIZE
     posts = posts[:PAGE_SIZE]
+    saved_ids = await get_saved_post_ids(db)
+    post_ids = [p.id for p in posts]
+    my_votes = await get_my_post_votes(db, post_ids)
     return templates.TemplateResponse(
         request,
         "feed.html",
@@ -113,6 +130,8 @@ async def feed_top(request: Request, page: int = Query(1, ge=1), since: str = Qu
             "since": since,
             "page": page,
             "has_next": has_next,
+            "saved_ids": saved_ids,
+            "my_votes": my_votes,
         },
     )
 
@@ -133,6 +152,10 @@ async def post_detail(request: Request, post_id: int):
     else:
         comment_tree.sort(key=lambda n: n.comment.created_at, reverse=True)
     mention_map = await get_mentions_for_post(db, post_id)
+    saved = await is_post_saved(db, post_id)
+    my_post_votes = await get_my_post_votes(db, [post_id])
+    comment_ids = [c.id for c in flat_comments]
+    my_comment_votes = await get_my_comment_votes(db, comment_ids)
     return templates.TemplateResponse(
         request,
         "post.html",
@@ -141,5 +164,8 @@ async def post_detail(request: Request, post_id: int):
             "comments": comment_tree,
             "sort": sort,
             "mention_map": mention_map,
+            "saved": saved,
+            "my_vote": my_post_votes.get(post_id, 0),
+            "my_comment_votes": my_comment_votes,
         },
     )

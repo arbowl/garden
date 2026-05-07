@@ -1,0 +1,5 @@
+<button class="star-btn{% if saved %} saved{% endif %}"
+  hx-post="/save/{{ post_id }}"
+  hx-target="this"
+  hx-swap="outerHTML"
+  title="{{ 'unsave' if saved else 'save' }}">{{ '★' if saved else '☆' }}</button>

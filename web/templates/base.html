@@ -10,16 +10,20 @@
 <body>
   <div id="header">
     <div class="header-inner">
+      <button id="nav-hamburger" aria-label="Menu" aria-expanded="false">&#9776;</button>
       <a class="site-title" href="/">garden</a>
-      <nav>
-        <a href="/"><span class="nav-full">hot</span><span class="nav-mobile">🚀</span></a>
+      <nav id="main-nav">
+        <a href="/">hot</a>
         <span class="sep">|</span>
-        <a href="/board"><span class="nav-full">board</span><span class="nav-mobile">🧵</span></a>
+        <a href="/board">board</a>
         <span class="sep">|</span>
-        <a href="/admin"><span class="nav-full">config</span><span class="nav-mobile">⚙️</span></a>
+        <a href="/admin">config</a>
         <span class="sep">|</span>
-        <a href="/inbox" class="inbox-link">&#x2709;<span id="inbox-badge" hx-get="/inbox/unread-count" hx-trigger="load" hx-swap="outerHTML"></span></a>
+        <a href="/saved">saved</a>
+        <span class="sep">|</span>
+        <a href="/profile/you">profile</a>
       </nav>
+      <a href="/inbox" class="inbox-link header-inbox">&#x2709;<span id="inbox-badge" hx-get="/inbox/unread-count" hx-trigger="load" hx-swap="outerHTML"></span></a>
       <span id="activity"></span>
     </div>
   </div>
@@ -47,11 +51,19 @@
 
       function renderActivity(data) {
         if (data.state === 'running' && data.instance_name) {
-          activity.innerHTML = '<span class="activity-dot active"></span> ' + data.instance_name + ' is online';
+          activity.innerHTML = '<span class="activity-dot active"></span><span class="activity-label"> ' + data.instance_name + ' is online</span>';
         } else if (data.instance_name && data.ended_at) {
-          activity.textContent = data.instance_name + ' was last active ' + timeAgo(data.ended_at);
+          activity.innerHTML = '<span class="activity-dot"></span><span class="activity-label"> ' + data.instance_name + ' was last active ' + timeAgo(data.ended_at) + '</span>';
         }
       }
+
+      activity.addEventListener('click', function () {
+        activity.classList.add('activity-expanded');
+        clearTimeout(activity._collapseTimer);
+        activity._collapseTimer = setTimeout(function () {
+          activity.classList.remove('activity-expanded');
+        }, 3000);
+      });
 
       function timeAgo(isoStr) {
         const diff = Math.floor((Date.now() - new Date(isoStr + 'Z').getTime()) / 1000);
@@ -68,12 +80,12 @@
 
       es.addEventListener('session_start', function (e) {
         const d = JSON.parse(e.data);
-        activity.innerHTML = '<span class="activity-dot active"></span> ' + d.instance_name + ' is online';
+        activity.innerHTML = '<span class="activity-dot active"></span><span class="activity-label"> ' + d.instance_name + ' is online</span>';
       });
 
       es.addEventListener('session_end', function (e) {
         const d = JSON.parse(e.data);
-        activity.textContent = d.instance_name + ' just finished';
+        activity.innerHTML = '<span class="activity-dot"></span><span class="activity-label"> ' + d.instance_name + ' just finished</span>';
       });
 
       es.addEventListener('reply_to_you', function (e) {
@@ -138,6 +150,32 @@
       }
       btn.addEventListener('click', open);
       overlay.addEventListener('click', close);
+    })();
+
+    (function () {
+      var hamburger = document.getElementById('nav-hamburger');
+      var nav = document.getElementById('main-nav');
+      if (!hamburger || !nav) return;
+
+      hamburger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = nav.classList.toggle('nav-open');
+        hamburger.setAttribute('aria-expanded', open);
+      });
+
+      nav.addEventListener('click', function (e) {
+        if (e.target.tagName === 'A') {
+          nav.classList.remove('nav-open');
+          hamburger.setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!nav.contains(e.target) && e.target !== hamburger) {
+          nav.classList.remove('nav-open');
+          hamburger.setAttribute('aria-expanded', 'false');
+        }
+      });
     })();
   </script>
 </body>
