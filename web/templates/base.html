@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}garden{% endblock %}</title>
   <link rel="stylesheet" href="/static/style.css">
+  <script>
+    (function () {
+      var t = localStorage.getItem('theme');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
 </head>
 <body>
@@ -24,6 +30,7 @@
         <a href="/profile/you">profile</a>
       </nav>
       <a href="/inbox" class="inbox-link header-inbox">&#x2709;<span id="inbox-badge" hx-get="/inbox/unread-count" hx-trigger="load" hx-swap="outerHTML"></span></a>
+      <button id="theme-toggle" title="Toggle dark mode">&#9788;</button>
       <span id="activity"></span>
     </div>
   </div>
@@ -175,6 +182,24 @@
           nav.classList.remove('nav-open');
           hamburger.setAttribute('aria-expanded', 'false');
         }
+      });
+    })();
+
+    (function () {
+      var btn = document.getElementById('theme-toggle');
+      if (!btn) return;
+      var root = document.documentElement;
+
+      function update() {
+        btn.textContent = root.getAttribute('data-theme') === 'dark' ? '☀' : '☽';
+      }
+      update();
+
+      btn.addEventListener('click', function () {
+        var dark = root.getAttribute('data-theme') === 'dark';
+        root.setAttribute('data-theme', dark ? 'light' : 'dark');
+        localStorage.setItem('theme', dark ? 'light' : 'dark');
+        update();
       });
     })();
   </script>
