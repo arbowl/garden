@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
 
 from db.connection import get_db
-from db.queries import get_saved_posts, is_post_saved, toggle_saved_post
+from db.queries import get_my_post_votes, get_saved_posts, is_post_saved, toggle_saved_post
 from web.templating import templates
 
 router = APIRouter()
@@ -28,6 +28,7 @@ async def saved_page(request: Request, page: int = Query(1, ge=1)):
     posts = await get_saved_posts(db, limit=PAGE_SIZE + 1, offset=offset)
     has_next = len(posts) > PAGE_SIZE
     posts = posts[:PAGE_SIZE]
+    my_votes = await get_my_post_votes(db, [p.id for p in posts])
     return templates.TemplateResponse(
         request,
         "saved.html",
@@ -35,5 +36,6 @@ async def saved_page(request: Request, page: int = Query(1, ge=1)):
             "posts": posts,
             "page": page,
             "has_next": has_next,
+            "my_votes": my_votes,
         },
     )

@@ -441,7 +441,7 @@ class AvatarSession:
         await update_session(self.db, stats.session_id, phase="react")
 
         if not self._over_budget():
-            await self._react(instance, archetype, memory, system_prompt, stats, rel_map=rel_map)
+            await self._react(instance, archetype, memory, system_prompt, stats, rel_map=rel_map, rel_scores=rel_scores)
 
     async def _triage(
         self,
@@ -643,6 +643,26 @@ class AvatarSession:
 
             if parent_id:
                 parent = next((c for c in comments if c.id == parent_id), None)
+                if parent and random.random() < archetype.vote_probability:
+                    rel_score = (
+                        rel_scores.get(parent.author_id)
+                        if rel_scores and parent.author_id
+                        else None
+                    )
+                    direction = _rel_nudge_direction(1, rel_score)
+                    if direction is not None:
+                        await insert_vote(
+                            self.db,
+                            voter_type=AuthorType.AVATAR,
+                            direction=direction,
+                            comment_id=parent_id,
+                            voter_id=self.instance_id,
+                        )
+                        stats.votes_cast += 1
+                        stats.pending_comment_votes = [
+                            v for v in stats.pending_comment_votes
+                            if v["comment_id"] != parent_id
+                        ]
                 if parent and parent.author_type == AuthorType.HUMAN:
                     await insert_notification(
                         self.db,
@@ -669,6 +689,7 @@ class AvatarSession:
         system_prompt: str,
         stats: SessionStats,
         rel_map: dict[str, str] | None = None,
+        rel_scores: dict[str, float] | None = None,
     ) -> None:
         pending = await get_pending_replies(
             self.db, self.instance_id, max_depth=settings.max_reply_depth
@@ -750,6 +771,22 @@ class AvatarSession:
             logger.info(
                 "[%s] replied to %s on post %d", instance.name, reply.author_name, reply.post_id
             )
+            if random.random() < archetype.vote_probability:
+                rel_score = (
+                    rel_scores.get(reply.author_id)
+                    if rel_scores and reply.author_id
+                    else None
+                )
+                direction = _rel_nudge_direction(1, rel_score)
+                if direction is not None:
+                    await insert_vote(
+                        self.db,
+                        voter_type=AuthorType.AVATAR,
+                        direction=direction,
+                        comment_id=reply.id,
+                        voter_id=self.instance_id,
+                    )
+                    stats.votes_cast += 1
             if reply.author_type == AuthorType.HUMAN:
                 await insert_notification(
                     self.db,

@@ -13,6 +13,20 @@ _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
 _IMG_TAG_RE = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
 _IMG_ATTR_RE = re.compile(r'\b(?:title|alt)="([^"]+)"', re.IGNORECASE)
+_SENTENCE_END_RE = re.compile(r"[.!?](?:\s|$)")
+_MIN_SENTENCE_CHARS = 80
+
+
+def _sentence_truncate(text: str, max_chars: int = 200) -> str | None:
+    if len(text) <= max_chars:
+        return text
+    cut = text[:max_chars]
+    m = None
+    for m in _SENTENCE_END_RE.finditer(cut):
+        pass
+    if m and m.end() >= _MIN_SENTENCE_CHARS:
+        return cut[: m.end()].rstrip()
+    return None
 
 
 def _strip_html(text: str) -> str:
@@ -32,7 +46,7 @@ def _strip_html(text: str) -> str:
 @dataclass
 class ExtractedContent:
     full_text: str
-    summary: str
+    summary: str | None
     word_count: int
     extraction_ok: bool
 
@@ -60,10 +74,9 @@ async def extract_content(url: str, fallback_summary: str | None = None) -> Extr
         text, ok = None, False
 
     if ok and text:
-        summary = (fallback_summary or text)[:200]
         return ExtractedContent(
             full_text=text,
-            summary=summary,
+            summary=_sentence_truncate(text),
             word_count=len(text.split()),
             extraction_ok=True,
         )
@@ -71,7 +84,7 @@ async def extract_content(url: str, fallback_summary: str | None = None) -> Extr
     fallback = _strip_html(fallback_summary or "")
     return ExtractedContent(
         full_text=fallback,
-        summary=fallback[:200],
+        summary=_sentence_truncate(fallback) if fallback else None,
         word_count=len(fallback.split()) if fallback else 0,
         extraction_ok=False,
     )

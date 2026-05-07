@@ -22,6 +22,7 @@ class CurateResponse(BaseModel):
     richness: Literal["headline_only", "summary", "full_text"]
     tags: list[str]
     default_score: float
+    summary: str | None = None
 
     @field_validator("relevance_score")
     @classmethod
@@ -40,6 +41,13 @@ class CurateResponse(BaseModel):
     def clean_tags(cls, v: list[str]) -> list[str]:
         """Clean tags by stripping whitespace, converting to lowercase, and limiting to 5 tags."""
         return [t.lower().strip() for t in v[:5] if t.strip()]
+
+    @field_validator("summary")
+    @classmethod
+    def clean_summary(cls, v: str | None) -> str | None:
+        if not v or not v.strip():
+            return None
+        return v.strip()[:300]
 
 
 def _clean_json(raw: str) -> str:

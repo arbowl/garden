@@ -3,6 +3,7 @@ logging."""
 
 import logging
 from dataclasses import dataclass
+from html import unescape
 
 import aiosqlite
 import feedparser  # type: ignore
@@ -33,7 +34,7 @@ async def _fetch_feed(client: httpx.AsyncClient, source: Source) -> list[dict]:
         entries = []
         for entry in feed.entries:
             url = str(entry.get("link", "")).strip()
-            title = str(entry.get("title", "")).strip()
+            title = unescape(str(entry.get("title", ""))).strip()
             if not url or not title:
                 continue
             raw_content = entry.get("summary") or entry.get("description") or None

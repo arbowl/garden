@@ -48,6 +48,7 @@ async def _curate_post(
 
     extracted = await extract_content(post.url, fallback_summary=post.raw_content)
     content_snippet = extracted.full_text or extracted.summary or post.title
+    has_content_beyond_title = content_snippet != post.title
 
     system, user = build_curator_prompt(post.title, source_name, source_tags, content_snippet)
     try:
@@ -92,7 +93,7 @@ async def _curate_post(
         tags=parsed.tags,
         default_score=default_score,
         full_text=extracted.full_text or None,
-        summary=extracted.summary or None,
+        summary=extracted.summary or (parsed.summary if has_content_beyond_title else None),
         word_count=extracted.word_count,
         extraction_ok=extracted.extraction_ok,
     )

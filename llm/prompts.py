@@ -7,7 +7,8 @@ _CURATOR_SCHEMA = """{
   "urgency": <"low" | "medium" | "high">,
   "richness": <"headline_only" | "summary" | "full_text">,
   "tags": [<list of 1-5 lowercase topic strings>],
-  "default_score": <float 0.0-10.0>
+  "default_score": <float 0.0-10.0>,
+  "summary": "<one sentence -- omit if the content adds nothing beyond the title>"
 }"""
 
 _CURATOR_SYSTEM = f"""\
