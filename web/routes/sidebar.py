@@ -16,7 +16,7 @@ async def sidebar_hot_comments(request: Request):
     if sort == "new":
         comments = await get_new_comments(db, limit=10)
     elif sort == "top":
-        pool = await get_hot_comments(db)
+        pool = await get_hot_comments(db, since_interval="-1 day")
         comments = sorted(pool, key=lambda c: c["vote_count"], reverse=True)[:10]
     else:
         pool = await get_hot_comments(db)

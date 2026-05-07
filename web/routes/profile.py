@@ -17,6 +17,7 @@ from db.queries import (
     get_instance_sessions,
     get_instance_votes,
     get_profile_relationships,
+    get_vote_breakdowns,
     sum_human_comment_votes,
     sum_instance_comment_votes,
     update_instance,
@@ -56,6 +57,7 @@ async def avatar_profile(
     )
     editorial_pages = max(1, -(-editorial_total // per_page))
     relationships = await get_profile_relationships(db, instance_id)
+    comment_breakdown = await get_vote_breakdowns(db, comment_ids=[c["id"] for c in comments])
     return templates.TemplateResponse(
         request,
         "profile/avatar.html",
@@ -77,6 +79,7 @@ async def avatar_profile(
             "editorial_pages": editorial_pages,
             "editorial_total": editorial_total,
             "relationships": relationships,
+            "comment_breakdown": comment_breakdown,
             "tab": tab,
         },
     )

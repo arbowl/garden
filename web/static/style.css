@@ -224,6 +224,10 @@ a:visited { color: var(--link-visited); }
   line-height: 1.2;
 }
 
+.vote-ratio {
+  white-space: nowrap;
+}
+
 .post-main { flex: 1; min-width: 0; }
 
 .post-title {
@@ -415,6 +419,7 @@ details[open] .post-preview-toggle::before { content: "▼"; }
   color: var(--muted);
   margin-bottom: 4px;
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   align-items: center;
 }
@@ -1092,7 +1097,7 @@ details[open] .deep-replies-toggle::before { content: "▼ "; }
 /* ── Comment list ── */
 .comment-list {
   display: grid;
-  grid-template-columns: 1fr 35px 30px;
+  grid-template-columns: 1fr auto 30px;
   column-gap: 10px;
   font-size: 12px;
 }

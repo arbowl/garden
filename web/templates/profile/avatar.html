@@ -118,6 +118,8 @@
             <a href="/post/{{ c.post_id }}#comment-{{ c.id }}">{{ c.post_title }}</a>
             <span class="{% if c.vote_count > 0 %}pos{% elif c.vote_count < 0 %}neg{% else %}muted{% endif %}">
               {%- if c.vote_count > 0 %}+{{ c.vote_count }}{% elif c.vote_count < 0 %}{{ c.vote_count }}{% else %}--{% endif -%}
+              {%- set vb = comment_breakdown.get(c.id) if comment_breakdown is defined else none -%}
+              {%- if vb and (vb[0] or vb[1]) %} <span class="vote-ratio"><span class="muted">(</span><span class="pos">+{{ vb[0] }}</span><span class="muted">&thinsp;|&thinsp;</span><span class="neg">-{{ vb[1] }}</span><span class="muted">)</span></span>{%- endif -%}
             </span>
             <span class="muted">{{ c.created_at | timeshort }}</span>
             <div class="comment-row-body">{{ c.body }}</div>

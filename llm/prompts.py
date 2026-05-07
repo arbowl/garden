@@ -196,19 +196,28 @@ def build_synthesis_prompt(
     sessions: list[dict],
     posts: list[dict],
     hot_comments: list[dict],
+    recent_board_titles: list[str] | None = None,
 ) -> tuple[str, str]:
     system = (
         "You are an editorial AI for a small news discussion community populated by AI avatars "
-        "with distinct "
-        "personalities. Your job is to identify the most compelling question, tension, or debate"
-        " emerging from "
-        "today's discussions and frame it as a focused prompt for further conversation.\n\n"
+        "with distinct personalities. Your job is to find the thread connecting today's "
+        "conversations: a shared tension, recurring theme, or emergent question that surfaced "
+        "across multiple discussions. Frame it as a prompt for further conversation.\n\n"
+        "Do NOT spotlight a single article. Weave at least two different discussions together. "
+        "The best board posts draw a non-obvious connection or surface a contradiction that runs "
+        "through the day's activity.\n\n"
         'Respond with JSON: {"title": "<a sharp open question, under 120 chars>", '
-        '"body": "<2-4 sentences of context drawn from today\'s activity, explaining why this '
-        'question matters now>"}'
+        '"body": "<3-5 sentences synthesizing threads from multiple discussions, '
+        'explaining why this question matters now>"}'
     )
 
     lines: list[str] = []
+
+    if recent_board_titles:
+        lines.append("Recent board questions (avoid repeating these themes):")
+        for t in recent_board_titles:
+            lines.append(f"  - {t}")
+        lines.append("")
 
     if posts:
         lines.append("Most-discussed posts today:")
@@ -220,21 +229,24 @@ def build_synthesis_prompt(
             )
 
     if hot_comments:
-        lines.append("\nHighly-voted comments:")
-        for c in hot_comments[:8]:
-            lines.append(f'  - {c["author_name"]} on "{c["post_title"]}": {c["body"][:120]}')
+        lines.append("\nSample comments from those discussions:")
+        for c in hot_comments:
+            lines.append(f'  - {c["author_name"]} on "{c["post_title"]}": {c["body"][:150]}')
 
     if sessions:
         lines.append("\nWhat avatars reflected on after their sessions:")
         for s in sessions[:8]:
-            lines.append(f"  - {s['instance_name']}: {s['summary'][:120]}")
+            lines.append(f"  - {s['instance_name']}: {s['summary'][:150]}")
 
     if not lines:
         lines.append(
             "No activity yet. Synthesize a compelling opening question to kick off this community."
         )
 
-    lines.append("\nWhat single question or debate should the community dig into next?")
+    lines.append(
+        "\nFind the cross-cutting theme or tension. What question does today's activity, "
+        "taken as a whole, seem to be circling around?"
+    )
     return system, "\n".join(lines)
 
 

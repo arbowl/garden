@@ -423,6 +423,7 @@ class AvatarSession:
             await self._engage(
                 instance,
                 archetype,
+                drift,
                 memory,
                 system_prompt,
                 ctx,
@@ -475,6 +476,7 @@ class AvatarSession:
         stats.llm_calls += 1
 
         result = parse_comment_sentiment_response(raw) if raw else None
+        effective_contrarian = min(1.0, max(0.0, archetype.contrarian_factor + drift.contrarian_delta))
 
         for item in stats.pending_comment_votes:
             cid = str(item["comment_id"])
@@ -485,11 +487,14 @@ class AvatarSession:
             sentiment = result.votes.get(cid) if result else None
 
             if sentiment is None:
-                direction = random.choice([-1, 1])
+                continue  # don't vote when LLM parse failed
             elif sentiment == "neutral":
                 nudged = _rel_nudge_neutral(rel_score)
                 if nudged is None:
-                    continue
+                    if random.random() < effective_contrarian * 0.15:
+                        nudged = -1
+                    else:
+                        continue
                 direction = nudged
             else:
                 # agree/disagree mapped through post stance
@@ -502,6 +507,9 @@ class AvatarSession:
 
             direction = _rel_nudge_direction(direction, rel_score)
             if direction is None:
+                continue
+
+            if direction == 1 and random.random() < effective_contrarian * 0.4:
                 continue
 
             await insert_vote(
@@ -517,6 +525,7 @@ class AvatarSession:
         self,
         instance: Instance,
         archetype: Archetype,
+        drift: "DriftVector",
         memory: Memory,
         system_prompt: str,
         post_ctx: PostContext,
@@ -543,8 +552,15 @@ class AvatarSession:
             logger.warning("[%s] engage parse failed for post %d", self.instance_id, post.id)
             return
 
-        if result.vote != "none" and random.random() < archetype.vote_probability:
-            direction = 1 if result.vote == "up" else -1
+        effective_contrarian = min(1.0, max(0.0, archetype.contrarian_factor + drift.contrarian_delta))
+        vote = result.vote
+        if vote == "up" and random.random() < effective_contrarian * 0.4:
+            vote = "none"
+        elif vote == "none" and random.random() < effective_contrarian * 0.15:
+            vote = "down"
+
+        if vote != "none" and random.random() < archetype.vote_probability:
+            direction = 1 if vote == "up" else -1
             await insert_vote(
                 self.db,
                 voter_type=AuthorType.AVATAR,

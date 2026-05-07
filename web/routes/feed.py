@@ -136,5 +136,10 @@ async def post_detail(request: Request, post_id: int):
     return templates.TemplateResponse(
         request,
         "post.html",
-        {"post": post, "comments": comment_tree, "sort": sort, "mention_map": mention_map},
+        {
+            "post": post,
+            "comments": comment_tree,
+            "sort": sort,
+            "mention_map": mention_map,
+        },
     )

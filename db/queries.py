@@ -1164,7 +1164,11 @@ async def get_new_comments(db: aiosqlite.Connection, limit: int = 10) -> list[di
     return [dict(r) for r in rows]
 
 
-async def get_hot_comments(db: aiosqlite.Connection, pool_size: int = 100) -> list[dict]:
+async def get_hot_comments(
+    db: aiosqlite.Connection,
+    pool_size: int = 100,
+    since_interval: str = "-30 days",
+) -> list[dict]:
     async with db.execute(
         """
         SELECT c.id, c.post_id, c.author_name, c.author_type, c.author_id, c.body, c.vote_count,
@@ -1173,11 +1177,11 @@ async def get_hot_comments(db: aiosqlite.Connection, pool_size: int = 100) -> li
         FROM comments c
         JOIN posts p ON p.id = c.post_id
         WHERE p.status NOT IN ('rejected')
-          AND c.created_at >= datetime('now', '-30 days')
+          AND c.created_at >= datetime('now', ?)
         ORDER BY c.vote_count DESC, c.created_at DESC
         LIMIT ?
         """,
-        (pool_size,),
+        (since_interval, pool_size),
     ) as cur:
         rows = await cur.fetchall()
     return [dict(r) for r in rows]
@@ -1427,19 +1431,38 @@ async def get_synthesis_context(db: aiosqlite.Connection, hours: int = 24) -> di
     ) as cur:
         posts = [dict(r) for r in await cur.fetchall()]
 
+    # Sample the top 2 comments per post rather than globally top comments,
+    # so the LLM has discussion texture from multiple articles.
+    post_ids = [p["id"] for p in posts]
+    per_post_comments: list[dict] = []
+    for pid in post_ids:
+        async with db.execute(
+            """
+            SELECT c.body, c.author_name, c.vote_count, p.title as post_title
+            FROM comments c JOIN posts p ON c.post_id = p.id
+            WHERE c.post_id = ? AND c.created_at >= datetime('now', ?)
+              AND p.source_name != 'board'
+            ORDER BY c.vote_count DESC, c.created_at DESC LIMIT 2
+            """,
+            (pid, interval),
+        ) as cur:
+            per_post_comments.extend(dict(r) for r in await cur.fetchall())
+
     async with db.execute(
         """
-        SELECT c.body, c.author_name, c.vote_count, p.title as post_title
-        FROM comments c JOIN posts p ON c.post_id = p.id
-        WHERE c.created_at >= datetime('now', ?) AND c.vote_count > 0
-          AND p.source_name != 'board'
-        ORDER BY c.vote_count DESC LIMIT 15
+        SELECT title FROM posts
+        WHERE source_name = 'board' AND status != 'archived'
+        ORDER BY created_at DESC LIMIT 5
         """,
-        (interval,),
     ) as cur:
-        hot_comments = [dict(r) for r in await cur.fetchall()]
+        recent_board_titles = [r["title"] for r in await cur.fetchall()]
 
-    return {"sessions": sessions, "posts": posts, "hot_comments": hot_comments}
+    return {
+        "sessions": sessions,
+        "posts": posts,
+        "hot_comments": per_post_comments,
+        "recent_board_titles": recent_board_titles,
+    }
 
 
 async def update_comment_body(
@@ -1536,6 +1559,37 @@ async def get_relationships_for_prompt(
     ) as cur:
         rows = await cur.fetchall()
     return [dict(r) for r in rows]
+
+
+async def get_vote_breakdowns(
+    db: aiosqlite.Connection,
+    *,
+    post_ids: list[int] | None = None,
+    comment_ids: list[int] | None = None,
+) -> dict[int, tuple[int, int]]:
+    """Batch up/down vote counts. Returns {id: (up, down)}. Pass exactly one keyword arg."""
+    if post_ids is not None:
+        col, ids = "post_id", post_ids
+    elif comment_ids is not None:
+        col, ids = "comment_id", comment_ids
+    else:
+        return {}
+    if not ids:
+        return {}
+    placeholders = ",".join("?" * len(ids))
+    async with db.execute(
+        f"""
+        SELECT {col},
+               SUM(CASE WHEN direction = 1 THEN 1 ELSE 0 END)  AS up,
+               SUM(CASE WHEN direction = -1 THEN 1 ELSE 0 END) AS down
+        FROM votes
+        WHERE {col} IN ({placeholders})
+        GROUP BY {col}
+        """,
+        ids,
+    ) as cur:
+        rows = await cur.fetchall()
+    return {row[col]: (int(row["up"] or 0), int(row["down"] or 0)) for row in rows}
 
 
 async def get_all_relationship_scores(

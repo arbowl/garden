@@ -23,7 +23,7 @@
         {% endif %}
         <span class="dot">·</span>
         {{ c.created_at | timeago }}
-        {% if c.vote_count > 0 %}<span class="dot">·</span>▲ {{ c.vote_count }}{% endif %}
+        {% if c.vote_count != 0 %}<span class="dot">·</span>{{ '▲' if c.vote_count > 0 else '▼' }} {{ c.vote_count }}{% endif %}
       </div>
       <a class="hot-comment-post" href="/post/{{ c.post_id }}" title="{{ c.post_title }}">{{ c.post_title[:45] }}{% if c.post_title | length > 45 %}…{% endif %}</a>
     </li>
