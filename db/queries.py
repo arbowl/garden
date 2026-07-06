@@ -1714,6 +1714,22 @@ async def get_my_comment_votes(db: aiosqlite.Connection, comment_ids: list[int])
     return {row["comment_id"]: row["direction"] for row in rows}
 
 
+async def get_comment_rel_map(db: aiosqlite.Connection, post_id: int) -> dict[str, float]:
+    """Return {'subject_id:object_id': score} for all relationships from commenters on a post."""
+    async with db.execute(
+        """
+        SELECT r.subject_id, r.object_id, r.score
+        FROM relationships r
+        WHERE r.subject_id IN (
+            SELECT DISTINCT author_id FROM comments WHERE post_id = ?
+        )
+        """,
+        (post_id,),
+    ) as cur:
+        rows = await cur.fetchall()
+    return {f"{row['subject_id']}:{row['object_id']}": row["score"] for row in rows}
+
+
 async def retract_vote(
     db: aiosqlite.Connection,
     voter_id: str,

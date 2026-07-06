@@ -7,6 +7,7 @@ from config import settings
 from db.connection import get_db
 from db.models import Comment, PostStatus
 from db.queries import (
+    get_comment_rel_map,
     get_comments_for_post,
     get_hot_posts,
     get_mentions_for_post,
@@ -156,6 +157,7 @@ async def post_detail(request: Request, post_id: int):
     my_post_votes = await get_my_post_votes(db, [post_id])
     comment_ids = [c.id for c in flat_comments]
     my_comment_votes = await get_my_comment_votes(db, comment_ids)
+    rel_map = await get_comment_rel_map(db, post_id)
     return templates.TemplateResponse(
         request,
         "post.html",
@@ -167,5 +169,6 @@ async def post_detail(request: Request, post_id: int):
             "saved": saved,
             "my_vote": my_post_votes.get(post_id, 0),
             "my_comment_votes": my_comment_votes,
+            "rel_map": rel_map,
         },
     )

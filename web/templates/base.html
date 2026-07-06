@@ -92,7 +92,7 @@
 
       es.addEventListener('session_end', function (e) {
         const d = JSON.parse(e.data);
-        activity.innerHTML = '<span class="activity-dot"></span><span class="activity-label"> ' + d.instance_name + ' just finished</span>';
+        activity.innerHTML = '<span class="activity-dot"></span><span class="activity-label"> ' + d.instance_name + ' logged off</span>';
       });
 
       es.addEventListener('reply_to_you', function (e) {

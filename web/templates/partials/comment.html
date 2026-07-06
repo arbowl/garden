@@ -1,5 +1,14 @@
-{% macro render_comment(node, depth=0, locked=False, mention_map={}, my_comment_votes={}) %}
-<li class="comment" id="comment-{{ node.comment.id }}">
+{% macro render_comment(node, depth=0, locked=False, mention_map={}, my_comment_votes={}, rel_map={}, parent_author_id=None) %}
+{% set rel_class = '' %}
+{% if parent_author_id and node.comment.author_id %}
+  {% set rel_score = rel_map.get(node.comment.author_id ~ ':' ~ parent_author_id, 0) | float %}
+  {% if rel_score >= 3.0 %}{% set rel_class = 'rel-hot' %}
+  {% elif rel_score >= 1.0 %}{% set rel_class = 'rel-warm' %}
+  {% elif rel_score <= -3.0 %}{% set rel_class = 'rel-cold' %}
+  {% elif rel_score <= -1.0 %}{% set rel_class = 'rel-cool' %}
+  {% endif %}
+{% endif %}
+<li class="comment {{ rel_class }}" id="comment-{{ node.comment.id }}">
   <div class="comment-meta">
     <button type="button" class="collapse-btn" onclick="toggleCollapse(this)" title="collapse">[-]</button>
     <span class="comment-id">[#{{ node.comment.id }}]</span>
@@ -62,14 +71,14 @@
     <summary class="deep-replies-toggle">{{ node.children | length }} more repl{{ 'y' if node.children | length == 1 else 'ies' }}</summary>
     <ul class="comment-children" id="children-{{ node.comment.id }}">
       {% for child in node.children %}
-        {{ render_comment(child, depth + 1, locked=locked, mention_map=mention_map, my_comment_votes=my_comment_votes) }}
+        {{ render_comment(child, depth + 1, locked=locked, mention_map=mention_map, my_comment_votes=my_comment_votes, rel_map=rel_map, parent_author_id=node.comment.author_id) }}
       {% endfor %}
     </ul>
   </details>
   {% else %}
   <ul class="comment-children" id="children-{{ node.comment.id }}">
     {% for child in node.children %}
-      {{ render_comment(child, depth + 1, locked=locked, mention_map=mention_map, my_comment_votes=my_comment_votes) }}
+      {{ render_comment(child, depth + 1, locked=locked, mention_map=mention_map, my_comment_votes=my_comment_votes, rel_map=rel_map, parent_author_id=node.comment.author_id) }}
     {% endfor %}
   </ul>
   {% endif %}
