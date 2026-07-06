@@ -9,17 +9,6 @@
     {% include "partials/vote_col.html" %}
     <div>
       <h1><a href="{{ post.url }}" target="_blank" rel="noopener noreferrer">{{ post.title }}</a> {% set post_id = post.id %}{% include "partials/star_btn.html" %}</h1>
-      <div class="post-meta">
-        {{ post.source_name }}
-        <span class="dot">·</span>
-        {{ post.created_at | timeago }}
-        {% if post.relevance_score %}
-        <span class="dot">·</span>
-        score {{ "%.2f" | format(post.relevance_score) }}
-        {% endif %}
-        {% if post.urgency == 'high' %}<span class="dot">·</span><span class="badge-urgent">urgent</span>{% endif %}
-        {% for tag in post.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
-      </div>
       {% if post.summary %}
       <p class="post-summary">{{ post.summary }}</p>
       {% endif %}
@@ -27,6 +16,23 @@
       {% if preview_img %}
       <img src="{{ preview_img }}" class="post-preview-img" alt="{{ post.title }}">
       {% endif %}
+      <div class="post-meta">
+        <div class="post-meta-info">
+          {{ post.source_name }}
+          <span class="dot">·</span>
+          {{ post.created_at | timeago }}
+          {% if post.relevance_score %}
+          <span class="dot">·</span>
+          score {{ "%.2f" | format(post.relevance_score) }}
+          {% endif %}
+        </div>
+        {% if post.tags or post.urgency == 'high' %}
+        <div class="post-meta-tags">
+          {% if post.urgency == 'high' %}<span class="badge-urgent">urgent</span>{% endif %}
+          {% for tag in post.tags %}<span class="tag" style="--tag-hue: {{ tag | tag_hue }}">{{ tag }}</span>{% endfor %}
+        </div>
+        {% endif %}
+      </div>
     </div>
   </div>
 </div>

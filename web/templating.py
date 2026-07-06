@@ -120,7 +120,15 @@ def _render_mentions(body: str, mentions: dict) -> Markup:
     return Markup(_MENTION_RE.sub(_replace, escaped))
 
 
+def _tag_hue(tag: str) -> int:
+    h = 5381
+    for c in tag:
+        h = ((h << 5) + h + ord(c)) & 0xFFFFFFFF
+    return h % 360
+
+
 templates.env.filters["domain"] = _domain
+templates.env.filters["tag_hue"] = _tag_hue
 templates.env.filters["timeago"] = _timeago
 templates.env.filters["timeshort"] = _timeshort
 templates.env.filters["preview_text"] = _preview_text
