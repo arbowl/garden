@@ -56,7 +56,7 @@
 
   <ul class="comment-tree" id="comment-tree">
     {% for node in comments %}
-      {{ render_comment(node, locked=locked, mention_map=mention_map, my_comment_votes=my_comment_votes) }}
+      {{ render_comment(node, locked=locked, mention_map=mention_map, my_comment_votes=my_comment_votes, rel_map=rel_map) }}
     {% endfor %}
   </ul>
   {% if not comments %}

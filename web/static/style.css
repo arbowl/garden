@@ -24,6 +24,10 @@
   --neg: #a33;
   --pos-dim: #5d8a5d;
   --neg-dim: #a05050;
+  --rel-warm: #96b896;
+  --rel-hot: #5d8a5d;
+  --rel-cool: #c09898;
+  --rel-cold: #a05050;
   --danger-hover-bg: #fde;
   --warn-bg: #fff8f0;
   --success-bg: #f0fff0;
@@ -59,6 +63,10 @@
   --neg: #cc5555;
   --pos-dim: #4a7a4a;
   --neg-dim: #884040;
+  --rel-warm: #3d5f3d;
+  --rel-hot: #4a7a4a;
+  --rel-cool: #5a3535;
+  --rel-cold: #884040;
   --danger-hover-bg: #2a1a1a;
   --warn-bg: #1e1610;
   --success-bg: #101e10;
@@ -520,6 +528,11 @@ details[open] .post-preview-toggle::before { content: "▼"; }
   padding: 6px 8px;
   margin: 3px 0;
 }
+
+.comment.rel-warm { border-left-color: var(--rel-warm); }
+.comment.rel-hot  { border-left-color: var(--rel-hot); }
+.comment.rel-cool { border-left-color: var(--rel-cool); }
+.comment.rel-cold { border-left-color: var(--rel-cold); }
 
 .comment-meta {
   font-size: 11px;
